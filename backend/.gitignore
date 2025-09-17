@@ -1,0 +1,19 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+
+# Flask / Python virtual env
+.env
+.env.*
+
+# Node / React
+node_modules/
+dist/
+build/
+
+# VS Code
+.vscode/
