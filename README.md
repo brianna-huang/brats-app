@@ -1,12 +1,11 @@
 # BRaTS Tumor Segmentation App
 
 **Work in Progress**
-I’m building a full-stack web app using **React (Vite)** on the frontend and **Flask (Python)** on the backend.
 
 ---
 
 ## Project Overview
-The goal of this app is to allow users to upload FLAIR and T1CE brain MRI images, and run an AI model on them that predict where possible tumors are, along with their tumor classes. It should overlay a color segment that highlights the tumor to see its location and shape. 
+The goal of this app is to allow users to upload FLAIR and T1CE brain MRI images, and run an AI model on them that predict where possible tumors are, along with their tumor classes. It should overlay a color segment that highlights the tumor to see its location and shape. Further features include allowing the user to manipulate AI generated segmentations. The app can be used as a teaching & learning aid, allowing radiologists and medical students to practice reading X-rays with AI guidance.
 
 ---
 
