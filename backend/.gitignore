@@ -6,6 +6,9 @@ __pycache__/
 *.pyd
 *.sqlite3
 
+# Models
+models/
+
 # Flask / Python virtual env
 .env
 .env.*
