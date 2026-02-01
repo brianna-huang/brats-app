@@ -1,3 +1,4 @@
+/* Global reset */
 #root {
   width: 100%;
   height: 100vh;
@@ -5,121 +6,166 @@
   padding: 0;
 }
 
-.app-container {
-  padding: 20px;
-  font-family: sans-serif;
+body {
+  margin: 0;
+  background-color: #121212;
+  color: #eaeaea;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+/* App layout */
+.app-container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
 .app-header {
   height: 60px;
-  padding: 0 20px;
-  /* border-bottom: 1px solid #ddd; */
+  padding: 0 24px;
   display: flex;
   align-items: center;
   background-color: #191919;
+  border-bottom: 1px solid #2b2b2b;
 }
 
 .app-header h1 {
-  align-items: center;
   font-size: 20px;
   margin: 0;
 }
 
+/* Main content area */
 .content {
   display: flex;
-  height: calc(100vh - 80px); /* full screen minus title */
+  flex: 1;
+  overflow: hidden;
 }
 
+/* Sidebar */
 .sidebar {
-  width: 170px;            /* narrower sidebar */
-  border-right: 1px solid #4c4c4c;
-  padding: 10px;
+  position: relative;
+  display: block;
+  width: 260px;                 /* wider + less cramped */
+  border-right: 1px solid #2f2f2f;
+  padding: 16px;
   overflow-y: auto;
-}
-
-.sidebar-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.delete-button {
-  background: none;
-  border: none;
-  color: rgb(196, 196, 196);
-  cursor: pointer;
-  font-size: 10px;
-}
-
-.main {
-  flex: 1;                 /* take ALL remaining space */
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;     /* center image horizontally */
+  background-color: #161616;
 }
 
 .sidebar-upload {
-  margin-bottom: 15px;
-  text-align: center;
+  margin-bottom: 24px;
 }
 
 .upload-button {
   width: 100%;
-  padding: 8px;
+  padding: 10px;
   cursor: pointer;
   font-weight: bold;
   background-color: #4a90e2;
   color: white;
   border: none;
-  border-radius: 5px;
+  border-radius: 6px;
 }
 
 .upload-button:hover {
   background-color: #357abd;
 }
 
+/* Case list */
 .file-button {
-  display: block;
   width: 100%;
-  margin-bottom: 8px;
-  padding: 6px;
+  text-align: left;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  border-radius: 5px;
+  border: none;
   cursor: pointer;
+  background-color: transparent;
+  color: #ddd;
+}
+
+.file-button:hover {
+  background-color: #2a2a2a;
 }
 
 .file-button.active {
+  background-color: #3a3a3a;
+  font-weight: 500;
+}
+
+/* Main image panel */
+.main {
+  flex: 1;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: auto;
+}
+
+/* Active filename */
+.active-file-name {
+  margin-bottom: 10px;
+  font-weight: bold;
+  font-size: 14px;
+  color: #ccc;
+}
+.case-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.case-row .file-button {
+  flex: 1;
+  text-align: left;
+}
+
+.case-row.active .file-button {
   background-color: #454545;
-  /* font-weight: bold; */
-} 
-
-.detect-button {
-  margin-top: 15px;
-  padding: 10px 16px;
-  font-size: 16px;
 }
 
+.delete-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  color: #aaa;
+}
+
+.delete-button:hover {
+  color: red;
+}
+
+.slice-lock {
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+/* Image container */
 .image-container {
-  position: relative; /* toolbar will be absolute relative to this */
-  display: inline-block; /* shrink to fit image */
-}
-
-.image-wrapper {
+  position: relative; /* anchor for toolbar */
   display: inline-block;
   max-width: 95%;
+}
+
+/* Image wrapper */
+.image-wrapper {
+  display: inline-block;
   max-height: 75vh;
 }
 
 .preview-image {
   display: block;
-  width: 100%;
-  height: auto;
+  max-width: 100%;
+  max-height: 75vh;
   object-fit: contain;
+  border-radius: 4px;
 }
 
-.active-file-name{
-  font-weight: bold;
-}
-
+/* Tumor overlay */
 .tumor-overlay {
   position: absolute;
   top: 30%;
@@ -131,17 +177,17 @@
   pointer-events: none;
 }
 
-/* Floating toolbar */
+/* Floating zoom toolbar */
 .zoom-toolbar {
   position: absolute;
   top: 10px;
-  right: 30px;
+  right: 10px;
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(0, 0, 0, 0.6);
-  padding: 4px 8px;
-  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.65);
+  padding: 6px 8px;
+  border-radius: 6px;
   z-index: 10;
   font-size: 13px;
 }
@@ -150,10 +196,73 @@
   padding: 4px 8px;
   font-size: 14px;
   cursor: pointer;
+  border: none;
+  background-color: #2f2f2f;
+  color: white;
+  border-radius: 4px;
+}
+
+.zoom-toolbar button:hover {
+  background-color: #444;
 }
 
 .zoom-indicator {
-  color: white;
-  font-size: 13px;
   font-weight: bold;
+  color: white;
+}
+
+/* Detect button */
+.detect-button {
+  margin-top: 16px;
+  padding: 10px 18px;
+  font-size: 15px;
+  cursor: pointer;
+  border-radius: 6px;
+  border: none;
+  background-color: #e04f4f;
+  color: white;
+}
+
+.detect-button:hover {
+  background-color: #c43e3e;
+}
+
+.volume-viewer {
+  display: flex;
+  gap: 30px;
+  justify-content: center;
+  width: 100%;
+}
+
+.volume-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 45%;
+}
+
+.image-container {
+  position: relative;
+  width: 100%;
+  max-width: 500px;     /* ⬅️ controls how big the images get */
+  aspect-ratio: 1 / 1; /* square viewer */
+  background: black;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.preview-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* keeps MRI proportions correct */
+}
+
+.slice-controls {
+  margin-top: 10px;
+  width: 100%;
+  text-align: center;
+}
+
+.slice-controls input[type="range"] {
+  width: 100%;
 }
