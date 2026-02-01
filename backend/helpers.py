@@ -1,85 +1,85 @@
-import os
-import io
 import torch
-import h5py
-import numpy as np
+import torch.nn.functional as F
 import nibabel as nib
+import numpy as np
 import cv2
-import matplotlib.pyplot as plt
-from flask import send_file
+import os
 
-IMG_SIZE = 128  # adjust to your model input size
+IMG_SIZE = 128
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def load_h5_volume(h5_path: str):
-    """Load 3D volume from HDF5 (.h5) file"""
-    with h5py.File(h5_path, "r") as f:
-        dataset_name = list(f.keys())[0]
-        volume = np.array(f[dataset_name])
-    return volume  # shape: (H, W, D)
+# 🔹 YOUR MODEL ARCHITECTURE
+from model import UNet  # change if your class name differs
 
-def load_nii_volume(nii_path: str):
-    """Load 3D volume from NIfTI (.nii) file"""
-    volume = nib.load(nii_path).get_fdata()
-    return np.array(volume)
-
-def get_slice(flair_path, t1ce_path, slice_idx=0):
-    """
-    Load a single slice from FLAIR and T1CE volumes (supports .h5 or .nii)
-    Returns a numpy array of shape (H, W, 2)
-    """
-    # Load volumes
-    if flair_path.endswith(".h5"):
-        flair_vol = load_h5_volume(flair_path)
-    else:
-        flair_vol = load_nii_volume(flair_path)
-
-    if t1ce_path.endswith(".h5"):
-        t1ce_vol = load_h5_volume(t1ce_path)
-    else:
-        t1ce_vol = load_nii_volume(t1ce_path)
-
-    # Extract slice
-    flair_slice = cv2.resize(flair_vol[:, :, slice_idx], (IMG_SIZE, IMG_SIZE)).astype("float32")
-    t1ce_slice = cv2.resize(t1ce_vol[:, :, slice_idx], (IMG_SIZE, IMG_SIZE)).astype("float32")
-
-    # Stack as channels
-    slice_input = np.stack([flair_slice, t1ce_slice], axis=-1)
-
-    # Normalize
-    max_val = np.max(slice_input)
-    if max_val > 0:
-        slice_input = slice_input / max_val
-
-    return slice_input  # shape: (H, W, 2)
-
-def slice_to_tensor(slice_input, device="cpu"):
-    """Convert (H, W, 2) slice to PyTorch tensor (1, 2, H, W)"""
-    tensor = torch.FloatTensor(slice_input).permute(2, 0, 1).unsqueeze(0)
-    return tensor.to(device)
-
-def predict_slice_overlay(flair_path, t1ce_path, model, device="cpu", slice_idx=0):
-    """
-    Run model on a single slice and return an overlay PNG
-    """
-    slice_input = get_slice(flair_path, t1ce_path, slice_idx)
-    tensor = slice_to_tensor(slice_input, device)
-
+def load_model():
+    model = UNet(in_channels=2, out_channels=4)
+    model.load_state_dict(
+        torch.load("models/final_model.pth", map_location=DEVICE)
+    )
+    model.to(DEVICE)
     model.eval()
+    return model
+
+
+def load_nifti(path):
+    return nib.load(path).get_fdata()
+
+
+def predict_single_slice(flair_slice, t1ce_slice, model):
+    # Resize
+    flair = cv2.resize(flair_slice, (IMG_SIZE, IMG_SIZE))
+    t1ce = cv2.resize(t1ce_slice, (IMG_SIZE, IMG_SIZE))
+
+    X = np.stack([flair, t1ce], axis=-1)
+    X = X[np.newaxis, ...]
+
+    X = X / np.max(X) if np.max(X) > 0 else X
+
+    X_tensor = torch.FloatTensor(X).permute(0, 3, 1, 2).to(DEVICE)
+
     with torch.no_grad():
-        pred = model(tensor)
-        pred = torch.softmax(pred, dim=1)  # multi-class
-        pred_np = pred.cpu().permute(0, 2, 3, 1).numpy()[0]  # (H, W, C)
+        pred = model(X_tensor)
+        pred = F.softmax(pred, dim=1)
 
-    # Sum over all tumor classes (assumes class 0 = background)
-    tumor_mask = np.sum(pred_np[:, :, 1:], axis=-1)
+    return pred.cpu().numpy()[0]  # (C, H, W)
 
-    # Convert mask to PNG overlay
-    plt.figure(figsize=(4, 4))
-    plt.imshow(tumor_mask, cmap="Reds", alpha=0.5)
-    plt.axis("off")
-    buf = io.BytesIO()
-    plt.savefig(buf, format="png", bbox_inches="tight", pad_inches=0)
-    buf.seek(0)
-    plt.close()
 
-    return buf
+def create_overlay(prediction):
+    # Combine tumor classes (1–3)
+    tumor_mask = np.argmax(prediction[1:], axis=0)
+    overlay = np.zeros((IMG_SIZE, IMG_SIZE, 4), dtype=np.uint8)
+
+    overlay[..., 0] = 255  # red
+    overlay[..., 3] = (tumor_mask > 0) * 120  # alpha
+
+    return overlay
+
+def nii_to_png_slices(nii_path, output_dir, modality_name):
+    """
+    Convert a NIfTI (.nii or .nii.gz) volume into individual PNG slices.
+    Returns a list of PNG file paths.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+
+    img = nib.load(nii_path).get_fdata()
+    num_slices = img.shape[2]
+
+    slice_paths = []
+
+    for i in range(num_slices):
+        slice_img = img[:, :, i]
+        # normalize to 0-255
+        slice_img = slice_img - slice_img.min()
+        if slice_img.max() > 0:
+            slice_img = slice_img / slice_img.max() * 255
+        slice_img = slice_img.astype(np.uint8)
+
+        # resize to OUTPUT_SIZE
+        slice_img = cv2.resize(slice_img, (IMG_SIZE, IMG_SIZE))
+
+        filename = f"{modality_name}_slice_{i}.png"
+        path = os.path.join(output_dir, filename)
+        cv2.imwrite(path, slice_img)
+        slice_paths.append(path)
+
+    return slice_paths
