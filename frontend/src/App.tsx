@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import "./App.css";
 
 interface Case {
-  id: string;
-  name: string;
+  id: string; // ex: "case_1"
+  name: string; // ex: "glioblastoma-baseline"
   folder: string;
   flair_slices: string[];
   t1ce_slices: string[];
@@ -12,8 +13,8 @@ interface Case {
 function App() {
   const [cases, setCases] = useState<Case[]>([]);
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
-  const [showOverlay, setShowOverlay] = useState(false);
   const [overlayUrl, setOverlayUrl] = useState<string | null>(null);
+  const [showOverlay, setShowOverlay] = useState(false);
   const [flairSlice, setFlairSlice] = useState(0);
   const [t1ceSlice, setT1ceSlice] = useState(0);
   const [lockSlices, setLockSlices] = useState(true);
@@ -28,10 +29,23 @@ function App() {
       .catch(console.error);
   }, []);
 
+// Update overlay when slider changes (if overlay is shown)
   useEffect(() => {
-    setOverlayUrl(null);
-    setShowOverlay(false);
-  }, [flairSlice, t1ceSlice, activeCaseId]);
+    if (!showOverlay || !activeCase) return;
+
+    // Re-fetch overlay for the current slice
+    fetch("/api/detect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        caseId: activeCase.id,
+        sliceIndex: flairSlice,
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => setOverlayUrl(data.overlayUrl + `?t=${Date.now()}`))
+      .catch(console.error);
+  }, [flairSlice, t1ceSlice, activeCaseId, showOverlay]);
 
   const activeCase = cases.find((c) => c.id === activeCaseId) || null;
 
@@ -75,15 +89,16 @@ function App() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         caseId: activeCase.id,
-        sliceIndex: flairSlice, // or synced slice
+        sliceIndex: flairSlice, // or t1ceSlice if synced
       }),
     });
 
     const data = await res.json();
-    setOverlayUrl(data.overlayUrl + `?t=${Date.now()}`); // cache bust
+    setOverlayUrl(data.overlayUrl + `?t=${Date.now()}`); // cache-busting
     setShowOverlay(true);
   };
 
+  // Handles case deletion
   const deleteCase = async (caseId: string) => {
     await fetch(`api/cases/${caseId}`, {
       method: "DELETE",
@@ -174,19 +189,48 @@ function App() {
                 <div className="volume-panel">
                   <h3>FLAIR</h3>
                   <div className="image-container">
-                    <img
-                      src={activeCase.flair_slices[flairSlice]}
-                      alt={`FLAIR slice ${flairSlice}`}
-                      className="preview-image"
-                    />
-                    {showOverlay && overlayUrl && (
-                      <img
-                        src={overlayUrl}
-                        className="overlay-image"
-                        alt="Tumor overlay"
-                      />
-                    )}
+                    <TransformWrapper
+                      initialScale={1}
+                      minScale={0.5}
+                      maxScale={5}
+                      wheel={{ step: 0.1 }}
+                    >
+                      {({ zoomIn, zoomOut, resetTransform }) => (
+                        <>
+                          {/* IMAGE + OVERLAY (these zoom together) */}
+                          <TransformComponent
+                            wrapperStyle={{ width: "100%", height: "100%" }}
+                            contentStyle={{ width: "100%", height: "100%" }}
+                          >
+                            <div className="image-stage">
+                              <div className="image-layer">
+                                <img
+                                  src={activeCase.flair_slices[flairSlice]}
+                                  className="preview-image"
+                                  alt="FLAIR"
+                                />
+                                {showOverlay && overlayUrl && (
+                                  <img
+                                    src={overlayUrl}
+                                    className="overlay-image"
+                                    alt="Tumor overlay"
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          </TransformComponent>
+
+                          {/* TOOLBAR (does NOT zoom) */}
+                          <div className="zoom-toolbar">
+                            <button onClick={() => zoomIn()}>+</button>
+                            <button onClick={() => zoomOut()}>−</button>
+                            <button onClick={() => resetTransform()}>Reset</button>
+                          </div>
+                        </>
+                      )}
+                    </TransformWrapper>
                   </div>
+
                   <div className="slice-controls">
                     <span>
                       Slice {flairSlice + 1} / {activeCase.flair_slices.length}
@@ -213,19 +257,48 @@ function App() {
                 <div className="volume-panel">
                   <h3>T1CE</h3>
                   <div className="image-container">
-                    <img
-                      src={activeCase.t1ce_slices[t1ceSlice]}
-                      alt={`T1CE slice ${t1ceSlice}`}
-                      className="preview-image"
-                    />
-                    {showOverlay && overlayUrl && (
-                      <img
-                        src={overlayUrl}
-                        className="overlay-image"
-                        alt="Tumor overlay"
-                      />
-                    )}
+                    <TransformWrapper
+                      initialScale={1}
+                      minScale={0.5}
+                      maxScale={5}
+                      wheel={{ step: 0.1 }}
+                    >
+                      {({ zoomIn, zoomOut, resetTransform }) => (
+                        <>
+                          {/* IMAGE + OVERLAY (these zoom together) */}
+                          <TransformComponent
+                            wrapperStyle={{ width: "100%", height: "100%" }}
+                            contentStyle={{ width: "100%", height: "100%" }}
+                          >
+                            <div className="image-stage">
+                              <div className="image-layer">
+                                <img
+                                  src={activeCase.t1ce_slices[t1ceSlice]}
+                                  className="preview-image"
+                                  alt="T1CE"
+                                />
+                                {showOverlay && overlayUrl && (
+                                  <img
+                                    src={overlayUrl}
+                                    className="overlay-image"
+                                    alt="Tumor overlay"
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          </TransformComponent>
+
+                          {/* TOOLBAR (does NOT zoom) */}
+                          <div className="zoom-toolbar">
+                            <button onClick={() => zoomIn()}>+</button>
+                            <button onClick={() => zoomOut()}>−</button>
+                            <button onClick={() => resetTransform()}>Reset</button>
+                          </div>
+                        </>
+                      )}
+                    </TransformWrapper>
                   </div>
+
                   <div className="slice-controls">
                     <span>
                       Slice {t1ceSlice + 1} / {activeCase.t1ce_slices.length}
@@ -249,6 +322,24 @@ function App() {
                   </div>
                 </div>
               </div>
+
+              {/* Legend for tumor classes*/}
+              {showOverlay && (
+                <div className="legend">
+                  <h4>Tumor Classes</h4>
+                  <div className="legend-item">
+                    <span className="legend-color necrotic" /> Necrotic / Core
+                  </div>
+                  <div className="legend-item">
+                    <span className="legend-color edema" /> Edema
+                  </div>
+                  <div className="legend-item">
+                    <span className="legend-color enhancing" /> Enhancing
+                  </div>
+                </div>
+              )}
+
+              {/* Detect tumors button */}
               <button className="detect-button" onClick={handleDetect}>
                 {showOverlay ? "Hide Overlay" : "Detect Tumors"}
               </button>
