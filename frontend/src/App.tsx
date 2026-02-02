@@ -13,10 +13,10 @@ function App() {
   const [cases, setCases] = useState<Case[]>([]);
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
   const [showOverlay, setShowOverlay] = useState(false);
+  const [overlayUrl, setOverlayUrl] = useState<string | null>(null);
   const [flairSlice, setFlairSlice] = useState(0);
   const [t1ceSlice, setT1ceSlice] = useState(0);
   const [lockSlices, setLockSlices] = useState(true);
-
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -27,6 +27,11 @@ function App() {
       .then((data) => setCases(data))
       .catch(console.error);
   }, []);
+
+  useEffect(() => {
+    setOverlayUrl(null);
+    setShowOverlay(false);
+  }, [flairSlice, t1ceSlice, activeCaseId]);
 
   const activeCase = cases.find((c) => c.id === activeCaseId) || null;
 
@@ -65,11 +70,18 @@ function App() {
   const handleDetect = async () => {
     if (!activeCase) return;
 
-    // Here you would call your model endpoint like:
-    // const res = await fetch(`/api/predict/${activeCase.id}`);
-    // const overlaySlices = await res.json();
-    // For now we just toggle fake overlay
-    setShowOverlay((prev) => !prev);
+    const res = await fetch("/api/detect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        caseId: activeCase.id,
+        sliceIndex: flairSlice, // or synced slice
+      }),
+    });
+
+    const data = await res.json();
+    setOverlayUrl(data.overlayUrl + `?t=${Date.now()}`); // cache bust
+    setShowOverlay(true);
   };
 
   const deleteCase = async (caseId: string) => {
@@ -167,7 +179,13 @@ function App() {
                       alt={`FLAIR slice ${flairSlice}`}
                       className="preview-image"
                     />
-                    {showOverlay && <div className="tumor-overlay" />}
+                    {showOverlay && overlayUrl && (
+                      <img
+                        src={overlayUrl}
+                        className="overlay-image"
+                        alt="Tumor overlay"
+                      />
+                    )}
                   </div>
                   <div className="slice-controls">
                     <span>
@@ -200,7 +218,13 @@ function App() {
                       alt={`T1CE slice ${t1ceSlice}`}
                       className="preview-image"
                     />
-                    {showOverlay && <div className="tumor-overlay" />}
+                    {showOverlay && overlayUrl && (
+                      <img
+                        src={overlayUrl}
+                        className="overlay-image"
+                        alt="Tumor overlay"
+                      />
+                    )}
                   </div>
                   <div className="slice-controls">
                     <span>
@@ -225,7 +249,6 @@ function App() {
                   </div>
                 </div>
               </div>
-
               <button className="detect-button" onClick={handleDetect}>
                 {showOverlay ? "Hide Overlay" : "Detect Tumors"}
               </button>
