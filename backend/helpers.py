@@ -79,6 +79,27 @@ def create_overlay(prediction):
 
     return overlay
 
+def create_multiclass_overlay(pred):
+    """
+    pred shape: (4, H, W)
+    """
+    seg = np.argmax(pred, axis=0)
+
+    overlay = np.zeros((IMG_SIZE, IMG_SIZE, 4), dtype=np.uint8)
+
+    colors = {
+        1: (255, 0, 0),    # NECROTIC - red
+        2: (0, 255, 0),    # EDEMA - green
+        3: (0, 0, 255),    # ENHANCING - blue
+    }
+
+    for cls, color in colors.items():
+        mask = seg == cls
+        overlay[mask, :3] = color
+        overlay[mask, 3] = 120
+
+    return overlay
+
 
 def nii_to_png_slices(nii_path, output_dir, modality_name):
     """

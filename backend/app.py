@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import shutil
 from werkzeug.utils import safe_join
 
-from helpers import predict_single_slice, load_model, create_overlay, nii_to_png_slices
+from helpers import predict_single_slice, load_model, create_overlay, nii_to_png_slices, create_multiclass_overlay
 
 app = Flask(__name__)
 CORS(app)
@@ -16,10 +16,9 @@ BACKEND_URL = "http://localhost:5050"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
-PREVIEW_DIR = os.path.abspath("previews")
 OVERLAY_DIR = os.path.abspath("overlays")
 
-for d in [UPLOAD_DIR, PREVIEW_DIR, OVERLAY_DIR]:
+for d in [UPLOAD_DIR, OVERLAY_DIR]:
     os.makedirs(d, exist_ok=True)
 
 # Load model ONCE
@@ -38,8 +37,8 @@ def upload_files():
         return jsonify({"error": "Please upload exactly 2 files: FLAIR and T1CE"}), 400
 
     # Create a unique case folder
-    case_id = str(len(cases) + 1)
-    case_folder = os.path.join(UPLOAD_DIR, f"case_{case_id}")
+    case_id = f"case_{len(cases) + 1}"
+    case_folder = os.path.join(UPLOAD_DIR, case_id)
     os.makedirs(case_folder, exist_ok=True)
 
     png_dir = os.path.join(case_folder, "png")
@@ -66,7 +65,7 @@ def upload_files():
 
     cases[case_id] = {
         "id": case_id,
-        "name": f"Case {case_id}",
+        "name": case_id,
         "folder": case_folder,
         "flair_slices": [
             f"{BACKEND_URL}/uploads/{os.path.basename(case_folder)}/png/{os.path.basename(p)}"
@@ -110,11 +109,12 @@ def delete_case(case_id):
 
 @app.route("/api/detect", methods=["POST"])
 def detect():
-    data = request.json
-    case_id = data["caseId"]
-    slice_idx = int(data["sliceIndex"])
+    case_id = request.json["caseId"] # ex: case_1
+    slice_index = request.json.get("sliceIndex")
 
-    case_dir = os.path.join(UPLOAD_DIR, f"case_{case_id}")
+    case_dir = os.path.join(UPLOAD_DIR, case_id)
+    if not os.path.exists(case_dir):
+        return jsonify({"error": "Case not found"}), 404
 
     flair_file = next(f for f in os.listdir(case_dir) if "flair" in f.lower())
     t1ce_file = next(f for f in os.listdir(case_dir) if "t1ce" in f.lower())
@@ -122,34 +122,37 @@ def detect():
     flair_vol = nib.load(os.path.join(case_dir, flair_file)).get_fdata()
     t1ce_vol = nib.load(os.path.join(case_dir, t1ce_file)).get_fdata()
 
-    # Safety check
-    slice_idx = np.clip(slice_idx, 0, flair_vol.shape[2] - 1)
+    z = slice_index if slice_index is not None else flair_vol.shape[2] // 2
 
     pred = predict_single_slice(
-        flair_vol[:, :, slice_idx],
-        t1ce_vol[:, :, slice_idx],
+        flair_vol[:, :, z],
+        t1ce_vol[:, :, z],
         model
     )
 
-    overlay = create_overlay(pred)
+    overlay = create_multiclass_overlay(pred)
 
-    os.makedirs(OVERLAY_DIR, exist_ok=True)
-    out_path = os.path.join(
-        OVERLAY_DIR, f"{case_id}_slice_{slice_idx}.png"
-    )
-
+    # Save overlay PNG
+    out_dir = os.path.join(OVERLAY_DIR, case_id)
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, f"slice_{z}.png")
     plt.imsave(out_path, overlay)
 
+    # Return overlay URL for this specific slice
     return jsonify({
-        "overlayUrl": f"/api/overlay/{case_id}/{slice_idx}"
+        "overlayUrl": f"/api/overlay/{case_id}/slice_{z}.png"
     })
 
-@app.route("/api/overlay/<case_id>/<int:slice_idx>")
-def get_overlay(case_id, slice_idx):
-    return send_file(
-        os.path.join(OVERLAY_DIR, f"{case_id}_slice_{slice_idx}.png"),
-        mimetype="image/png"
-    )
+@app.route("/api/overlay/<case_id>/<slice_file>")
+def get_overlay(case_id, slice_file):
+    """
+    Serve a specific overlay PNG
+    slice_file must include the '.png' extension
+    """
+    file_path = os.path.join(OVERLAY_DIR, case_id, slice_file)
+    if not os.path.exists(file_path):
+        return "Overlay not found", 404
+    return send_file(file_path, mimetype="image/png")
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5050, debug=True)
