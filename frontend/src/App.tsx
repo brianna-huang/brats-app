@@ -84,6 +84,11 @@ function App() {
   const handleDetect = async () => {
     if (!activeCase) return;
 
+    if (showOverlay) {
+      setShowOverlay(false);
+      return;
+    }
+
     const res = await fetch("/api/detect", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -173,17 +178,8 @@ function App() {
         <div className="main">
           {activeCase ? (
             <>
-            <h2>Case {activeCaseId}</h2>
-              <div className="slice-lock">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={lockSlices}
-                    onChange={(e) => setLockSlices(e.target.checked)}
-                  />
-                  Lock slices
-                </label>
-              </div>
+            <h2>{activeCaseId}</h2>
+              
               <div className="volume-viewer">
                 {/* FLAIR */}
                 <div className="volume-panel">
@@ -321,6 +317,17 @@ function App() {
 
                   </div>
                 </div>
+              </div>
+
+              <div className="slice-lock">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={lockSlices}
+                    onChange={(e) => setLockSlices(e.target.checked)}
+                  />
+                  Lock slices
+                </label>
               </div>
 
               {/* Legend for tumor classes*/}
