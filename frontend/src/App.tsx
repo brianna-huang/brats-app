@@ -3,8 +3,8 @@ import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import "./App.css";
 
 interface Case {
-  id: string; // ex: "case_1"
-  name: string; // ex: "glioblastoma-baseline"
+  id: string; // stable, backend ID (case_1)
+  name: string; // editable display name
   folder: string;
   flair_slices: string[];
   t1ce_slices: string[];
@@ -13,13 +13,51 @@ interface Case {
 function App() {
   const [cases, setCases] = useState<Case[]>([]);
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
+  const [editingCaseId, setEditingCaseId] = useState<string | null>(null);
+  const [editedName, setEditedName] = useState("");
   const [overlayUrl, setOverlayUrl] = useState<string | null>(null);
+  const [overlayOpacity, setOverlayOpacity] = useState(0.5); // default 50% transparency
   const [showOverlay, setShowOverlay] = useState(false);
   const [flairSlice, setFlairSlice] = useState(0);
   const [t1ceSlice, setT1ceSlice] = useState(0);
   const [lockSlices, setLockSlices] = useState(true);
+  const [sidebarWidth, setSidebarWidth] = useState(260); // initial width
+
+
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
+  const handleMouseDown = (e: React.MouseEvent) => {
+    isDragging.current = true;
+    e.preventDefault();
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isDragging.current) return;
+    const newWidth = e.clientX;
+    const minWidth = 150;
+    const maxWidth = 500;
+    if (newWidth >= minWidth && newWidth <= maxWidth) {
+      setSidebarWidth(newWidth);
+    }
+  };
+
+  const handleMouseUp = () => {
+    isDragging.current = false;
+  };
+
+  useEffect(() => {
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, []);
+
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const activeCase = cases.find((c) => c.id === activeCaseId) || null;
 
   // Fetch all cases on load
   useEffect(() => {
@@ -46,8 +84,6 @@ function App() {
       .then((data) => setOverlayUrl(data.overlayUrl + `?t=${Date.now()}`))
       .catch(console.error);
   }, [flairSlice, t1ceSlice, activeCaseId, showOverlay]);
-
-  const activeCase = cases.find((c) => c.id === activeCaseId) || null;
 
   // Handle upload button click (opens file picker)
   const handleUploadClick = () => {
@@ -116,20 +152,42 @@ function App() {
     }
   };
 
+  const saveCaseName = async (c: Case) => {
+    if (!editedName.trim()) return;
+
+    await fetch(`/api/cases/${c.id}/rename`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: editedName }),
+    });
+
+    setCases((prev) =>
+      prev.map((cs) =>
+        cs.id === c.id ? { ...cs, name: editedName } : cs
+      )
+    );
+
+    setEditingCaseId(null);
+  };
+
 
   return (
     <div className="app-container">
       {/* Header */}
       <header className="app-header">
-        <h1>Brain Tumor Viewer</h1>
+        <h1>Brain Tumor Segmentation</h1>
       </header>
 
       <div className="content">
         {/* Sidebar */}
-        <div className="sidebar">
+        <div 
+          className="sidebar"
+          ref={sidebarRef}
+          style={{ width: `${sidebarWidth}px` }}
+        >
           <div className="sidebar-upload">
             <button className="upload-button" onClick={handleUploadClick}>
-              Upload Case
+              Upload
             </button>
             <input
               type="file"
@@ -145,19 +203,33 @@ function App() {
             {cases.map((c) => (
               <div
                 key={c.id}
-                className={`case-row ${c.id === activeCaseId ? "active" : ""}`}
+                className={"case-row"}
               >
-                <button
-                  className="file-button"
-                  onClick={() => {
-                    setActiveCaseId(c.id);
-                    setFlairSlice(0);
-                    setT1ceSlice(0);
-                    setShowOverlay(false);
-                  }}
-                >
-                  {c.name}
-                </button>
+                {editingCaseId === c.id ? (
+                  <input
+                    autoFocus
+                    value={editedName}
+                    onChange={(e) => setEditedName(e.target.value)}
+                    onBlur={() => saveCaseName(c)}
+                    onKeyDown={(e) => e.key === "Enter" && saveCaseName(c)}
+                  />
+                ) : (
+                  <button
+                    className={`file-button ${c.id === activeCaseId ? "active" : ""}`}
+                    onClick={() => {
+                      setActiveCaseId(c.id);
+                      setFlairSlice(0);
+                      setT1ceSlice(0);
+                      setShowOverlay(false);
+                    }}
+                    onDoubleClick={() => {
+                      setEditingCaseId(c.id);
+                      setEditedName(c.name);
+                    }}
+                  >
+                    {c.name}
+                  </button>
+                )}
 
                 <button
                   className="delete-button"
@@ -172,14 +244,94 @@ function App() {
               </div>
             ))}
           </div>
+          {/* drag handle */}
+          <div
+            className="sidebar-resize-handle"
+            onMouseDown={handleMouseDown}
+          ></div>
         </div>
 
         {/* Main viewer */}
         <div className="main">
           {activeCase ? (
             <>
-            <h2>{activeCaseId}</h2>
-              
+            <h2>{activeCase.name}</h2>
+            {/* Overlay & slice controls panel */}
+            <div className="controls-panel">
+
+            <div className="overlay-toggle">
+              {/* Lock slices */}
+              <label>
+                <input
+                  type="checkbox"
+                  checked={lockSlices}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setLockSlices(checked);
+
+                    // Uncheck overlay if slices are unlocked
+                    if (!checked) {
+                      setShowOverlay(false);
+                    }
+                  }}
+                />
+                Lock slices
+              </label>
+
+              {/* Show / Hide Tumor Overlay */}
+              <label 
+                title={!lockSlices ? "Lock slices to enable overlay" : ""}
+                className={!lockSlices ? "disabled-checkbox" : ""}
+              >
+                <input
+                  type="checkbox"
+                  checked={showOverlay}
+                  onChange={(e) => {
+                    if (!lockSlices) return;
+                    const checked = e.target.checked;
+                    if (checked) {
+                      handleDetect(); // run detection when checked
+                    } else {
+                      setShowOverlay(false); // hide overlay when unchecked
+                    }
+                  }}
+                  disabled={!lockSlices}
+                />
+                Show Tumor Overlay
+              </label>
+              </div>
+
+              {/* Overlay opacity */}
+              {showOverlay && (
+                <div className="opacity-slider">
+                  <label>Overlay Opacity</label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={overlayOpacity}
+                    onChange={(e) => setOverlayOpacity(parseFloat(e.target.value))}
+                  />
+                </div>
+              )}
+              {/* Legend */}
+              {showOverlay && (
+                <div className="legend-panel">
+                  <h4>Tumor Classes</h4>
+                  <div className="legend-item">
+                    <span className="legend-color necrotic" /> Necrotic / Core
+                  </div>
+                  <div className="legend-item">
+                    <span className="legend-color edema" /> Edema
+                  </div>
+                  <div className="legend-item">
+                    <span className="legend-color enhancing" /> Enhancing
+                  </div>
+                </div>
+              )}
+            </div>
+
               <div className="volume-viewer">
                 {/* FLAIR */}
                 <div className="volume-panel">
@@ -210,6 +362,7 @@ function App() {
                                     src={overlayUrl}
                                     className="overlay-image"
                                     alt="Tumor overlay"
+                                    style={{ opacity: overlayOpacity }}
                                   />
                                 )}
                               </div>
@@ -278,6 +431,7 @@ function App() {
                                     src={overlayUrl}
                                     className="overlay-image"
                                     alt="Tumor overlay"
+                                    style={{ opacity: overlayOpacity }}
                                   />
                                 )}
                               </div>
@@ -318,38 +472,6 @@ function App() {
                   </div>
                 </div>
               </div>
-
-              <div className="slice-lock">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={lockSlices}
-                    onChange={(e) => setLockSlices(e.target.checked)}
-                  />
-                  Lock slices
-                </label>
-              </div>
-
-              {/* Legend for tumor classes*/}
-              {showOverlay && (
-                <div className="legend">
-                  <h4>Tumor Classes</h4>
-                  <div className="legend-item">
-                    <span className="legend-color necrotic" /> Necrotic / Core
-                  </div>
-                  <div className="legend-item">
-                    <span className="legend-color edema" /> Edema
-                  </div>
-                  <div className="legend-item">
-                    <span className="legend-color enhancing" /> Enhancing
-                  </div>
-                </div>
-              )}
-
-              {/* Detect tumors button */}
-              <button className="detect-button" onClick={handleDetect}>
-                {showOverlay ? "Hide Overlay" : "Detect Tumors"}
-              </button>
             </>
           ) : (
             <p>Please upload a case or select one from the sidebar.</p>
