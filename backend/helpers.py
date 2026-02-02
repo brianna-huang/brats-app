@@ -8,8 +8,8 @@ import os
 IMG_SIZE = 128
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# 🔹 YOUR MODEL ARCHITECTURE
-from model import UNet  # change if your class name differs
+# 🔹 OUR MODEL ARCHITECTURE
+from model import UNet
 
 def load_model():
     model = UNet(in_channels=2, out_channels=4)
@@ -43,16 +43,42 @@ def predict_single_slice(flair_slice, t1ce_slice, model):
 
     return pred.cpu().numpy()[0]  # (C, H, W)
 
+# def create_overlay(prediction):
+    # """
+    # Creates an overlay where all tumor classes are same color
+    # """
+#     tumor_mask = np.argmax(prediction, axis=0)
+#     overlay = np.zeros((IMG_SIZE, IMG_SIZE, 4), dtype=np.uint8)
+#     mask = tumor_mask > 0  # any tumor
+#     overlay[..., 0][mask] = 255  # red
+#     overlay[..., 3][mask] = 120  # alpha
+#     return overlay
 
 def create_overlay(prediction):
-    # Combine tumor classes (1–3)
-    tumor_mask = np.argmax(prediction[1:], axis=0)
+    """
+    Creates an RGBA overlay where different tumor classes have different colors.
+    SEGMENT_CLASSES = { 0 : 'NOT tumor', 1 : 'NECROTIC/CORE', 2 : 'EDEMA', 3 : 'ENHANCING' }
+    """
+    tumor_mask = np.argmax(prediction, axis=0)  # now include background as 0
     overlay = np.zeros((IMG_SIZE, IMG_SIZE, 4), dtype=np.uint8)
 
-    overlay[..., 0] = 255  # red
-    overlay[..., 3] = (tumor_mask > 0) * 120  # alpha
+    # For 3 tumor classes:
+    # 1 = red, 2 = green, 3 = blue
+    colors = {
+        1: (255, 0, 0),
+        2: (0, 255, 0),
+        3: (0, 0, 255)
+    }
+
+    for cls, (r, g, b) in colors.items():
+        mask = tumor_mask == cls
+        overlay[..., 0][mask] = r
+        overlay[..., 1][mask] = g
+        overlay[..., 2][mask] = b
+        overlay[..., 3][mask] = 120  # alpha
 
     return overlay
+
 
 def nii_to_png_slices(nii_path, output_dir, modality_name):
     """

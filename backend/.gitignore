@@ -9,6 +9,7 @@ __pycache__/
 # Models
 models/
 uploads/
+overlays/
 
 # Flask / Python virtual env
 .env

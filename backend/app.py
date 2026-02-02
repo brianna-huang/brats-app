@@ -110,34 +110,44 @@ def delete_case(case_id):
 
 @app.route("/api/detect", methods=["POST"])
 def detect():
-    case_id = request.json["caseId"]
-    case_dir = os.path.join(UPLOAD_DIR, case_id)
+    data = request.json
+    case_id = data["caseId"]
+    slice_idx = int(data["sliceIndex"])
 
-    flair = next(f for f in os.listdir(case_dir) if "flair" in f.lower())
-    t1ce = next(f for f in os.listdir(case_dir) if "t1ce" in f.lower())
+    case_dir = os.path.join(UPLOAD_DIR, f"case_{case_id}")
 
-    flair_vol = nib.load(os.path.join(case_dir, flair)).get_fdata()
-    t1ce_vol = nib.load(os.path.join(case_dir, t1ce)).get_fdata()
+    flair_file = next(f for f in os.listdir(case_dir) if "flair" in f.lower())
+    t1ce_file = next(f for f in os.listdir(case_dir) if "t1ce" in f.lower())
 
-    mid = flair_vol.shape[2] // 2
+    flair_vol = nib.load(os.path.join(case_dir, flair_file)).get_fdata()
+    t1ce_vol = nib.load(os.path.join(case_dir, t1ce_file)).get_fdata()
+
+    # Safety check
+    slice_idx = np.clip(slice_idx, 0, flair_vol.shape[2] - 1)
+
     pred = predict_single_slice(
-        flair_vol[:, :, mid],
-        t1ce_vol[:, :, mid],
+        flair_vol[:, :, slice_idx],
+        t1ce_vol[:, :, slice_idx],
         model
     )
 
     overlay = create_overlay(pred)
-    out_path = os.path.join(OVERLAY_DIR, f"{case_id}.png")
+
+    os.makedirs(OVERLAY_DIR, exist_ok=True)
+    out_path = os.path.join(
+        OVERLAY_DIR, f"{case_id}_slice_{slice_idx}.png"
+    )
+
     plt.imsave(out_path, overlay)
 
     return jsonify({
-        "overlayUrl": f"/api/overlay/{case_id}"
+        "overlayUrl": f"/api/overlay/{case_id}/{slice_idx}"
     })
 
-@app.route("/api/overlay/<case_id>")
-def get_overlay(case_id):
+@app.route("/api/overlay/<case_id>/<int:slice_idx>")
+def get_overlay(case_id, slice_idx):
     return send_file(
-        os.path.join(OVERLAY_DIR, f"{case_id}.png"),
+        os.path.join(OVERLAY_DIR, f"{case_id}_slice_{slice_idx}.png"),
         mimetype="image/png"
     )
 
