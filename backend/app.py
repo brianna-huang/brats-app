@@ -7,7 +7,10 @@ import matplotlib.pyplot as plt
 import shutil
 from werkzeug.utils import safe_join
 
-from helpers import predict_single_slice, load_model, create_overlay, nii_to_png_slices, create_multiclass_overlay
+from helpers import (predict_single_slice, load_model, 
+                     create_overlay, nii_to_png_slices, 
+                     create_multiclass_overlay, load_metadata, 
+                     save_metadata)
 
 app = Flask(__name__)
 CORS(app)
@@ -63,9 +66,11 @@ def upload_files():
     flair_slices = nii_to_png_slices(flair_path, png_dir, "flair")
     t1ce_slices = nii_to_png_slices(t1ce_path, png_dir, "t1ce")
 
+    metadata = load_metadata()
+
     cases[case_id] = {
         "id": case_id,
-        "name": case_id,
+        "name": metadata.get(case_id, {}).get("name", case_id),
         "folder": case_folder,
         "flair_slices": [
             f"{BACKEND_URL}/uploads/{os.path.basename(case_folder)}/png/{os.path.basename(p)}"
@@ -92,7 +97,19 @@ def serve_png(case_folder, filename):
 
 @app.route("/api/cases")
 def get_cases():
-    return jsonify(list(cases.values()))
+    metadata = load_metadata()
+
+    result = []
+    for case_id, case in cases.items():
+        result.append({
+            "id": case_id,
+            "folder": case["folder"],
+            "name": metadata.get(case_id, {}).get("name", case_id),
+            "flair_slices": case["flair_slices"],
+            "t1ce_slices": case["t1ce_slices"],
+        })
+
+    return jsonify(result)
 
 @app.route("/api/cases/<case_id>", methods=["DELETE"])
 def delete_case(case_id):
@@ -106,6 +123,19 @@ def delete_case(case_id):
 
     del cases[case_id]
     return {"message": "Case deleted"}
+
+@app.route("/api/cases/<case_id>/rename", methods=["POST"])
+def rename_case(case_id):
+    new_name = request.json.get("name")
+    if not new_name:
+        return {"error": "Missing name"}, 400
+
+    metadata = load_metadata()
+    metadata.setdefault(case_id, {})
+    metadata[case_id]["name"] = new_name
+    save_metadata(metadata)
+
+    return {"status": "ok"}
 
 @app.route("/api/detect", methods=["POST"])
 def detect():

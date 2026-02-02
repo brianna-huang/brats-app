@@ -4,6 +4,7 @@ import nibabel as nib
 import numpy as np
 import cv2
 import os
+import json
 
 IMG_SIZE = 128
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -43,16 +44,6 @@ def predict_single_slice(flair_slice, t1ce_slice, model):
 
     return pred.cpu().numpy()[0]  # (C, H, W)
 
-# def create_overlay(prediction):
-    # """
-    # Creates an overlay where all tumor classes are same color
-    # """
-#     tumor_mask = np.argmax(prediction, axis=0)
-#     overlay = np.zeros((IMG_SIZE, IMG_SIZE, 4), dtype=np.uint8)
-#     mask = tumor_mask > 0  # any tumor
-#     overlay[..., 0][mask] = 255  # red
-#     overlay[..., 3][mask] = 120  # alpha
-#     return overlay
 
 def create_overlay(prediction):
     """
@@ -130,3 +121,22 @@ def nii_to_png_slices(nii_path, output_dir, modality_name):
         slice_paths.append(path)
 
     return slice_paths
+
+METADATA_PATH = "case_metadata.json"
+
+def load_metadata():
+    if not os.path.exists(METADATA_PATH):
+        return {}
+
+    try:
+        with open(METADATA_PATH, "r") as f:
+            content = f.read().strip()
+            if not content:
+                return {}
+            return json.loads(content)
+    except (json.JSONDecodeError, IOError):
+        return {}
+
+def save_metadata(data):
+    with open(METADATA_PATH, "w") as f:
+        json.dump(data, f, indent=2)
