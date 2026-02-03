@@ -1,11 +1,13 @@
-# BRaTS Tumor Segmentation App
+# Brain Tumor Segmentation App
 
 **Work in Progress**
 
 ---
 
 ## Project Overview
-The goal of this app is to allow users to upload FLAIR and T1CE brain MRI images, and run an AI model on them that predict where possible tumors are, along with their tumor classes. It should overlay a color segment that highlights the tumor to see its location and shape. Further features include allowing the user to manipulate AI generated segmentations. The app can be used as a teaching & learning aid, allowing radiologists and medical students to practice reading X-rays with AI guidance.
+The Brain Tumor Segmentation App allows users to upload FLAIR and T1CE brain MRI images for tumor detection. It uses an AI model to predict where possible tumors are, overlaying a color segment that highlights the different tumor classes to see their location and shape. The main viewer page allows users to scroll through slices of any view (axial, sagittal, coronal).
+
+The app can be used as a teaching & learning aid, allowing radiologists and medical students to practice reading X-rays with AI guidance.
 
 ---
 
