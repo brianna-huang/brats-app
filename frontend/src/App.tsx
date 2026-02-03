@@ -18,19 +18,17 @@ function App() {
   const [overlayUrl, setOverlayUrl] = useState<string | null>(null);
   const [overlayOpacity, setOverlayOpacity] = useState(0.5); // default 50% transparency
   const [showOverlay, setShowOverlay] = useState(false);
-  const [flairSlice, setFlairSlice] = useState(0);
-  const [t1ceSlice, setT1ceSlice] = useState(0);
-  const [lockSlices, setLockSlices] = useState(true);
+  const [view, setView] = useState<"axial"|"sagittal"|"coronal">("axial");
+  const [sliceIndex, setSliceIndex] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(260); // initial width
 
-
+  // sidebar adjustment logic
   const sidebarRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const handleMouseDown = (e: React.MouseEvent) => {
     isDragging.current = true;
     e.preventDefault();
   };
-
   const handleMouseMove = (e: MouseEvent) => {
     if (!isDragging.current) return;
     const newWidth = e.clientX;
@@ -54,10 +52,9 @@ function App() {
     };
   }, []);
 
-
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const activeCase = cases.find((c) => c.id === activeCaseId) || null;
+  const activeCase = cases.find((c) => c.id === activeCaseId) || null;
 
   // Fetch all cases on load
   useEffect(() => {
@@ -77,13 +74,14 @@ function App() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         caseId: activeCase.id,
-        sliceIndex: flairSlice,
+        sliceIndex: sliceIndex,
+        view: view
       }),
     })
       .then((res) => res.json())
       .then((data) => setOverlayUrl(data.overlayUrl + `?t=${Date.now()}`))
       .catch(console.error);
-  }, [flairSlice, t1ceSlice, activeCaseId, showOverlay]);
+  }, [sliceIndex, activeCaseId, showOverlay, view]);
 
   // Handle upload button click (opens file picker)
   const handleUploadClick = () => {
@@ -111,8 +109,7 @@ function App() {
     setActiveCaseId(data.case.id);
 
     // Reset slice indices
-    setFlairSlice(0);
-    setT1ceSlice(0);
+    setSliceIndex(0);
     setShowOverlay(false);
   };
 
@@ -130,7 +127,8 @@ function App() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         caseId: activeCase.id,
-        sliceIndex: flairSlice, // or t1ceSlice if synced
+        sliceIndex: sliceIndex,
+        view: view
       }),
     });
 
@@ -170,6 +168,26 @@ function App() {
     setEditingCaseId(null);
   };
 
+  // Update overlay when slice or view changes
+  useEffect(() => {
+    if (!showOverlay || !activeCase) return;
+
+    fetch("/api/detect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        caseId: activeCase.id,
+        sliceIndex: sliceIndex,
+        view: view
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        setOverlayUrl(data.overlayUrl + `?t=${Date.now()}`);
+        // setMaxSlice(data.maxIndex);
+      })
+      .catch(console.error);
+  }, [sliceIndex, view, activeCaseId, showOverlay]);
 
   return (
     <div className="app-container">
@@ -218,8 +236,7 @@ function App() {
                     className={`file-button ${c.id === activeCaseId ? "active" : ""}`}
                     onClick={() => {
                       setActiveCaseId(c.id);
-                      setFlairSlice(0);
-                      setT1ceSlice(0);
+                      setSliceIndex(0);
                       setShowOverlay(false);
                     }}
                     onDoubleClick={() => {
@@ -256,50 +273,57 @@ function App() {
           {activeCase ? (
             <>
             <h2>{activeCase.name}</h2>
-            {/* Overlay & slice controls panel */}
+            {/* Controls panel */}
             <div className="controls-panel">
 
-            <div className="overlay-toggle">
-              {/* Lock slices */}
-              <label>
-                <input
-                  type="checkbox"
-                  checked={lockSlices}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setLockSlices(checked);
-
-                    // Uncheck overlay if slices are unlocked
-                    if (!checked) {
-                      setShowOverlay(false);
-                    }
-                  }}
-                />
-                Lock slices
-              </label>
-
-              {/* Show / Hide Tumor Overlay */}
-              <label 
-                title={!lockSlices ? "Lock slices to enable overlay" : ""}
-                className={!lockSlices ? "disabled-checkbox" : ""}
-              >
-                <input
-                  type="checkbox"
-                  checked={showOverlay}
-                  onChange={(e) => {
-                    if (!lockSlices) return;
-                    const checked = e.target.checked;
-                    if (checked) {
-                      handleDetect(); // run detection when checked
-                    } else {
-                      setShowOverlay(false); // hide overlay when unchecked
-                    }
-                  }}
-                  disabled={!lockSlices}
-                />
-                Show Tumor Overlay
-              </label>
+              {/* Dropdown to select view */}
+              <div className="view-controls">
+                <label>
+                  View:{" "}
+                  <select value={view} onChange={(e) => {
+                    setView(e.target.value as "axial"|"sagittal"|"coronal");
+                    setSliceIndex(0); // reset slice to first for new view
+                  }}>
+                    <option value="axial">Axial</option>
+                    <option value="sagittal">Sagittal</option>
+                    <option value="coronal">Coronal</option>
+                  </select>
+                </label>
               </div>
+
+              {/* Show/hide tumor checkbox */}
+              <div className="overlay-toggle">
+                {/* Show / Hide Tumor Overlay */}
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={showOverlay}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      if (checked) {
+                        handleDetect(); // run detection when checked
+                      } else {
+                        setShowOverlay(false); // hide overlay when unchecked
+                      }
+                    }}
+                  />
+                  Show Tumor Overlay
+                </label>
+              </div>
+
+              {/* Slice slider */}
+              <div className="slice-controls">
+                    <span>
+                      Slice {sliceIndex + 1} / {activeCase.flair_slices[view].length}
+                    </span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={activeCase.flair_slices[view].length - 1}
+                      value={sliceIndex}
+                      onChange={(e) => setSliceIndex(Number(e.target.value))}
+                    />
+                  </div>
 
               {/* Overlay opacity */}
               {showOverlay && (
@@ -332,7 +356,9 @@ function App() {
               )}
             </div>
 
+              {/* Image viewers */}
               <div className="volume-viewer">
+
                 {/* FLAIR */}
                 <div className="volume-panel">
                   <h3>FLAIR</h3>
@@ -353,9 +379,9 @@ function App() {
                             <div className="image-stage">
                               <div className="image-layer">
                                 <img
-                                  src={activeCase.flair_slices[flairSlice]}
+                                  src={activeCase?.flair_slices[view][sliceIndex]}
                                   className="preview-image"
-                                  alt="FLAIR"
+                                  alt={`FLAIR ${view}`}
                                 />
                                 {showOverlay && overlayUrl && (
                                   <img
@@ -378,27 +404,6 @@ function App() {
                         </>
                       )}
                     </TransformWrapper>
-                  </div>
-
-                  <div className="slice-controls">
-                    <span>
-                      Slice {flairSlice + 1} / {activeCase.flair_slices.length}
-                    </span>
-                    <input
-                      type="range"
-                      min={0}
-                      max={activeCase.flair_slices.length - 1}
-                      value={flairSlice}
-                      onChange={(e) => {
-                        const value = Number(e.target.value);
-                        setFlairSlice(value);
-                        if (lockSlices) {
-                          setT1ceSlice(
-                            Math.min(value, activeCase.t1ce_slices.length - 1)
-                          );
-                        }
-                      }}
-                    />
                   </div>
                 </div>
 
@@ -422,9 +427,9 @@ function App() {
                             <div className="image-stage">
                               <div className="image-layer">
                                 <img
-                                  src={activeCase.t1ce_slices[t1ceSlice]}
+                                  src={activeCase?.t1ce_slices[view][sliceIndex]}
                                   className="preview-image"
-                                  alt="T1CE"
+                                  alt={`T1CE ${view}`}
                                 />
                                 {showOverlay && overlayUrl && (
                                   <img
@@ -447,28 +452,6 @@ function App() {
                         </>
                       )}
                     </TransformWrapper>
-                  </div>
-
-                  <div className="slice-controls">
-                    <span>
-                      Slice {t1ceSlice + 1} / {activeCase.t1ce_slices.length}
-                    </span>
-                    <input
-                      type="range"
-                      min={0}
-                      max={activeCase.t1ce_slices.length - 1}
-                      value={t1ceSlice}
-                      onChange={(e) => {
-                        const value = Number(e.target.value);
-                        setT1ceSlice(value);
-                        if (lockSlices) {
-                          setFlairSlice(
-                            Math.min(value, activeCase.flair_slices.length - 1)
-                          );
-                        }
-                      }}
-                    />
-
                   </div>
                 </div>
               </div>

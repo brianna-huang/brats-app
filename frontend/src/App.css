@@ -328,13 +328,14 @@ body, input, button {
 
 .slice-controls input[type="range"] {
   -webkit-appearance: none;  /* remove default styling */
-  width: 100%;
+  width: 50%;
   height: 6px;
   background: #444;           /* dark track */
   border-radius: 3px;
   outline: none;
   margin-top: 6px;
   margin-bottom: 6px;
+  margin-left: 6px;
 }
 
 .slice-controls input[type="range"]::-webkit-slider-thumb {
@@ -467,8 +468,8 @@ body, input, button {
 .controls-panel {
   display: flex;
   align-items: center;
-  gap: 20px;
-  margin-bottom: 16px;
+  gap: 10px;
+  margin-bottom: 10px;
   flex-wrap: wrap;
   background: rgba(30, 30, 30, 0.8);
   padding: 8px 12px;
