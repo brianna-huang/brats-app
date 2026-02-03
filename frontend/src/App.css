@@ -320,8 +320,8 @@ body, input, button {
 }
 
 .slice-controls {
-  margin-top: 10px;
-  margin-bottom: 15px;
+  margin-top: 0px;
+  margin-bottom: 5px;
   width: 100%;
   text-align: left;
 }
@@ -516,14 +516,4 @@ body, input, button {
   align-items: center;
   gap: 6px;
   cursor: pointer;
-}
-
-.overlay-toggle label.disabled-checkbox {
-  color: #888; /* greyed out text */
-  cursor: not-allowed;
-}
-
-.overlay-toggle input[type="checkbox"]:disabled {
-  accent-color: #555; /* makes checkbox itself greyed out */
-  cursor: not-allowed;
 }

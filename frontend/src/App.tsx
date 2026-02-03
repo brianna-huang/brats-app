@@ -6,8 +6,16 @@ interface Case {
   id: string; // stable, backend ID (case_1)
   name: string; // editable display name
   folder: string;
-  flair_slices: string[];
-  t1ce_slices: string[];
+  flair_slices: {
+    axial: string[];
+    sagittal: string[];
+    coronal: string[];
+  };
+  t1ce_slices: {
+    axial: string[];
+    sagittal: string[];
+    coronal: string[];
+  };
 }
 
 function App() {
