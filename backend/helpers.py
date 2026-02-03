@@ -95,36 +95,13 @@ def create_multiclass_overlay(pred):
     return overlay
 
 
-def nii_to_png_slices(nii_path, output_dir, modality_name):
-    """
-    AXIAL AXIS ONLY
-    Convert a NIfTI (.nii or .nii.gz) volume into individual PNG slices.
-    Returns a list of PNG file paths.
-    """
-    os.makedirs(output_dir, exist_ok=True)
-
-    img = nib.load(nii_path).get_fdata()
-    num_slices = img.shape[2]
-
-    slice_paths = []
-
-    for i in range(num_slices):
-        slice_img = img[:, :, i]
-        # normalize to 0-255
-        slice_img = slice_img - slice_img.min()
-        if slice_img.max() > 0:
-            slice_img = slice_img / slice_img.max() * 255
-        slice_img = slice_img.astype(np.uint8)
-
-        # resize to OUTPUT_SIZE
-        slice_img = cv2.resize(slice_img, (IMG_SIZE, IMG_SIZE))
-
-        filename = f"{modality_name}_slice_{i}.png"
-        path = os.path.join(output_dir, filename)
-        cv2.imwrite(path, slice_img)
-        slice_paths.append(path)
-
-    return slice_paths
+def normalize_and_resize(slice_img):
+    slice_img = slice_img - slice_img.min()
+    if slice_img.max() > 0:
+        slice_img = slice_img / slice_img.max() * 255
+    slice_img = slice_img.astype(np.uint8)
+    slice_img = cv2.resize(slice_img, (128, 128))  # or IMG_SIZE
+    return slice_img
 
 
 def nii_to_png_slices_all_views(nii_path, output_dir, modality_name):

@@ -138,56 +138,6 @@ def rename_case(case_id):
 
     return {"status": "ok"}
 
-# @app.route("/api/detect", methods=["POST"])
-# def detect():
-#     """
-#     Get overlay for axial slice only
-#     """
-#     case_id = request.json["caseId"] # ex: case_1
-#     slice_index = request.json.get("sliceIndex")
-
-#     case_dir = os.path.join(UPLOAD_DIR, case_id)
-#     if not os.path.exists(case_dir):
-#         return jsonify({"error": "Case not found"}), 404
-
-#     flair_file = next(f for f in os.listdir(case_dir) if "flair" in f.lower())
-#     t1ce_file = next(f for f in os.listdir(case_dir) if "t1ce" in f.lower())
-
-#     flair_vol = nib.load(os.path.join(case_dir, flair_file)).get_fdata()
-#     t1ce_vol = nib.load(os.path.join(case_dir, t1ce_file)).get_fdata()
-
-#     z = slice_index if slice_index is not None else flair_vol.shape[2] // 2
-
-#     pred = predict_single_slice(
-#         flair_vol[:, :, z],
-#         t1ce_vol[:, :, z],
-#         model
-#     )
-
-#     overlay = create_multiclass_overlay(pred)
-
-#     # Save overlay PNG
-#     out_dir = os.path.join(OVERLAY_DIR, case_id)
-#     os.makedirs(out_dir, exist_ok=True)
-#     out_path = os.path.join(out_dir, f"slice_{z}.png")
-#     plt.imsave(out_path, overlay)
-
-#     # Return overlay URL for this specific slice
-#     return jsonify({
-#         "overlayUrl": f"/api/overlay/{case_id}/slice_{z}.png"
-#     })
-
-# @app.route("/api/overlay/<case_id>/<slice_file>")
-# def get_overlay(case_id, slice_file):
-#     """
-#     Serve a specific overlay PNG
-#     slice_file must include the '.png' extension
-#     """
-#     file_path = os.path.join(OVERLAY_DIR, case_id, slice_file)
-#     if not os.path.exists(file_path):
-#         return "Overlay not found", 404
-#     return send_file(file_path, mimetype="image/png")
-
 @app.route("/api/detect", methods=["POST"])
 def detect():
     case_id = request.json["caseId"]  # ex: case_1
@@ -229,6 +179,9 @@ def detect():
 
     pred = predict_single_slice(flair_slice, t1ce_slice, model)
     overlay = create_multiclass_overlay(pred)
+
+    if view in ["sagittal", "coronal"]:
+        overlay = np.rot90(overlay, k=-1)
 
     # Save overlay PNG
     out_dir = os.path.join(OVERLAY_DIR, case_id, view)
