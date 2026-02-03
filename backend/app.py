@@ -8,7 +8,7 @@ import shutil
 from werkzeug.utils import safe_join
 
 from helpers import (predict_single_slice, load_model, 
-                     create_overlay, nii_to_png_slices, 
+                     nii_to_png_slices_all_views,
                      create_multiclass_overlay, load_metadata, 
                      save_metadata)
 
@@ -62,9 +62,8 @@ def upload_files():
     if not flair_path or not t1ce_path:
         return jsonify({"error": "Files must include flair and t1ce"}), 400
 
-    # Convert NIfTI -> PNG slices in png_dir
-    flair_slices = nii_to_png_slices(flair_path, png_dir, "flair")
-    t1ce_slices = nii_to_png_slices(t1ce_path, png_dir, "t1ce")
+    flair_views = nii_to_png_slices_all_views(flair_path, png_dir, "flair")
+    t1ce_views = nii_to_png_slices_all_views(t1ce_path, png_dir, "t1ce")
 
     metadata = load_metadata()
 
@@ -72,14 +71,16 @@ def upload_files():
         "id": case_id,
         "name": metadata.get(case_id, {}).get("name", case_id),
         "folder": case_folder,
-        "flair_slices": [
-            f"{BACKEND_URL}/uploads/{os.path.basename(case_folder)}/png/{os.path.basename(p)}"
-            for p in flair_slices
-        ],
-        "t1ce_slices": [
-            f"{BACKEND_URL}/uploads/{os.path.basename(case_folder)}/png/{os.path.basename(p)}"
-            for p in t1ce_slices
-        ],
+        "flair_slices": {
+            "axial": [f"{BACKEND_URL}/uploads/{case_id}/png/{os.path.basename(p)}" for p in flair_views["axial"]],
+            "sagittal": [f"{BACKEND_URL}/uploads/{case_id}/png/{os.path.basename(p)}" for p in flair_views["sagittal"]],
+            "coronal": [f"{BACKEND_URL}/uploads/{case_id}/png/{os.path.basename(p)}" for p in flair_views["coronal"]],
+        },
+        "t1ce_slices": {
+            "axial": [f"{BACKEND_URL}/uploads/{case_id}/png/{os.path.basename(p)}" for p in t1ce_views["axial"]],
+            "sagittal": [f"{BACKEND_URL}/uploads/{case_id}/png/{os.path.basename(p)}" for p in t1ce_views["sagittal"]],
+            "coronal": [f"{BACKEND_URL}/uploads/{case_id}/png/{os.path.basename(p)}" for p in t1ce_views["coronal"]],
+        },
     }
 
     return jsonify({"message": "Files uploaded", "case": cases[case_id]})
@@ -137,10 +138,61 @@ def rename_case(case_id):
 
     return {"status": "ok"}
 
+# @app.route("/api/detect", methods=["POST"])
+# def detect():
+#     """
+#     Get overlay for axial slice only
+#     """
+#     case_id = request.json["caseId"] # ex: case_1
+#     slice_index = request.json.get("sliceIndex")
+
+#     case_dir = os.path.join(UPLOAD_DIR, case_id)
+#     if not os.path.exists(case_dir):
+#         return jsonify({"error": "Case not found"}), 404
+
+#     flair_file = next(f for f in os.listdir(case_dir) if "flair" in f.lower())
+#     t1ce_file = next(f for f in os.listdir(case_dir) if "t1ce" in f.lower())
+
+#     flair_vol = nib.load(os.path.join(case_dir, flair_file)).get_fdata()
+#     t1ce_vol = nib.load(os.path.join(case_dir, t1ce_file)).get_fdata()
+
+#     z = slice_index if slice_index is not None else flair_vol.shape[2] // 2
+
+#     pred = predict_single_slice(
+#         flair_vol[:, :, z],
+#         t1ce_vol[:, :, z],
+#         model
+#     )
+
+#     overlay = create_multiclass_overlay(pred)
+
+#     # Save overlay PNG
+#     out_dir = os.path.join(OVERLAY_DIR, case_id)
+#     os.makedirs(out_dir, exist_ok=True)
+#     out_path = os.path.join(out_dir, f"slice_{z}.png")
+#     plt.imsave(out_path, overlay)
+
+#     # Return overlay URL for this specific slice
+#     return jsonify({
+#         "overlayUrl": f"/api/overlay/{case_id}/slice_{z}.png"
+#     })
+
+# @app.route("/api/overlay/<case_id>/<slice_file>")
+# def get_overlay(case_id, slice_file):
+#     """
+#     Serve a specific overlay PNG
+#     slice_file must include the '.png' extension
+#     """
+#     file_path = os.path.join(OVERLAY_DIR, case_id, slice_file)
+#     if not os.path.exists(file_path):
+#         return "Overlay not found", 404
+#     return send_file(file_path, mimetype="image/png")
+
 @app.route("/api/detect", methods=["POST"])
 def detect():
-    case_id = request.json["caseId"] # ex: case_1
+    case_id = request.json["caseId"]  # ex: case_1
     slice_index = request.json.get("sliceIndex")
+    view = request.json.get("view", "axial")  # 'axial', 'sagittal', or 'coronal'
 
     case_dir = os.path.join(UPLOAD_DIR, case_id)
     if not os.path.exists(case_dir):
@@ -152,37 +204,52 @@ def detect():
     flair_vol = nib.load(os.path.join(case_dir, flair_file)).get_fdata()
     t1ce_vol = nib.load(os.path.join(case_dir, t1ce_file)).get_fdata()
 
-    z = slice_index if slice_index is not None else flair_vol.shape[2] // 2
+    # Determine slice index along chosen view
+    if view == "axial":
+        max_index = flair_vol.shape[2] - 1
+        z = slice_index if slice_index is not None else flair_vol.shape[2] // 2
+        flair_slice = flair_vol[:, :, z]
+        t1ce_slice = t1ce_vol[:, :, z]
+    elif view == "sagittal":
+        max_index = flair_vol.shape[0] - 1
+        z = slice_index if slice_index is not None else flair_vol.shape[0] // 2
+        flair_slice = flair_vol[z, :, :]
+        t1ce_slice = t1ce_vol[z, :, :]
+        flair_slice = np.rot90(flair_slice)  # rotate for display
+        t1ce_slice = np.rot90(t1ce_slice)
+    elif view == "coronal":
+        max_index = flair_vol.shape[1] - 1
+        z = slice_index if slice_index is not None else flair_vol.shape[1] // 2
+        flair_slice = flair_vol[:, z, :]
+        t1ce_slice = t1ce_vol[:, z, :]
+        flair_slice = np.rot90(flair_slice)
+        t1ce_slice = np.rot90(t1ce_slice)
+    else:
+        return jsonify({"error": "Invalid view"}), 400
 
-    pred = predict_single_slice(
-        flair_vol[:, :, z],
-        t1ce_vol[:, :, z],
-        model
-    )
-
+    pred = predict_single_slice(flair_slice, t1ce_slice, model)
     overlay = create_multiclass_overlay(pred)
 
     # Save overlay PNG
-    out_dir = os.path.join(OVERLAY_DIR, case_id)
+    out_dir = os.path.join(OVERLAY_DIR, case_id, view)
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, f"slice_{z}.png")
     plt.imsave(out_path, overlay)
 
-    # Return overlay URL for this specific slice
     return jsonify({
-        "overlayUrl": f"/api/overlay/{case_id}/slice_{z}.png"
+        "overlayUrl": f"/api/overlay/{case_id}/{view}/slice_{z}.png",
+        "sliceIndex": z,
+        "maxIndex": max_index
     })
 
-@app.route("/api/overlay/<case_id>/<slice_file>")
-def get_overlay(case_id, slice_file):
-    """
-    Serve a specific overlay PNG
-    slice_file must include the '.png' extension
-    """
-    file_path = os.path.join(OVERLAY_DIR, case_id, slice_file)
+
+@app.route("/api/overlay/<case_id>/<view>/<slice_file>")
+def get_overlay(case_id, view, slice_file):
+    file_path = os.path.join(OVERLAY_DIR, case_id, view, slice_file)
     if not os.path.exists(file_path):
         return "Overlay not found", 404
     return send_file(file_path, mimetype="image/png")
+
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5050, debug=True)

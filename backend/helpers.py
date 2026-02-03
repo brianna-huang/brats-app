@@ -5,12 +5,14 @@ import numpy as np
 import cv2
 import os
 import json
+from PIL import Image
+
+# OUR MODEL ARCHITECTURE
+from model import UNet
 
 IMG_SIZE = 128
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-# 🔹 OUR MODEL ARCHITECTURE
-from model import UNet
+METADATA_PATH = "case_metadata.json"
 
 def load_model():
     model = UNet(in_channels=2, out_channels=4)
@@ -70,6 +72,7 @@ def create_overlay(prediction):
 
     return overlay
 
+
 def create_multiclass_overlay(pred):
     """
     pred shape: (4, H, W)
@@ -94,6 +97,7 @@ def create_multiclass_overlay(pred):
 
 def nii_to_png_slices(nii_path, output_dir, modality_name):
     """
+    AXIAL AXIS ONLY
     Convert a NIfTI (.nii or .nii.gz) volume into individual PNG slices.
     Returns a list of PNG file paths.
     """
@@ -122,7 +126,58 @@ def nii_to_png_slices(nii_path, output_dir, modality_name):
 
     return slice_paths
 
-METADATA_PATH = "case_metadata.json"
+
+def nii_to_png_slices_all_views(nii_path, output_dir, modality_name):
+    """
+    Convert a NIfTI (.nii or .nii.gz) volume into PNG slices in all three views:
+    axial (z), sagittal (x), coronal (y)
+    Returns a dict:
+    {
+        "axial": [list of file paths],
+        "sagittal": [...],
+        "coronal": [...]
+    }
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    img = nib.load(nii_path).get_fdata()
+
+    views = {}
+
+    # AXIAL (z-axis)
+    axial_paths = []
+    for i in range(img.shape[2]):
+        slice_img = img[:, :, i]
+        slice_img = normalize_and_resize(slice_img)
+        filename = f"{modality_name}_axial_{i}.png"
+        path = os.path.join(output_dir, filename)
+        cv2.imwrite(path, slice_img)
+        axial_paths.append(path)
+    views["axial"] = axial_paths
+
+    # SAGITTAL (x-axis)
+    sagittal_paths = []
+    for i in range(img.shape[0]):
+        slice_img = img[i, :, :]
+        slice_img = normalize_and_resize(slice_img)
+        filename = f"{modality_name}_sagittal_{i}.png"
+        path = os.path.join(output_dir, filename)
+        cv2.imwrite(path, slice_img)
+        sagittal_paths.append(path)
+    views["sagittal"] = sagittal_paths
+
+    # CORONAL (y-axis)
+    coronal_paths = []
+    for i in range(img.shape[1]):
+        slice_img = img[:, i, :]
+        slice_img = normalize_and_resize(slice_img)
+        filename = f"{modality_name}_coronal_{i}.png"
+        path = os.path.join(output_dir, filename)
+        cv2.imwrite(path, slice_img)
+        coronal_paths.append(path)
+    views["coronal"] = coronal_paths
+
+    return views
+
 
 def load_metadata():
     if not os.path.exists(METADATA_PATH):
@@ -136,6 +191,7 @@ def load_metadata():
             return json.loads(content)
     except (json.JSONDecodeError, IOError):
         return {}
+
 
 def save_metadata(data):
     with open(METADATA_PATH, "w") as f:
