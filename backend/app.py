@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import shutil
 from werkzeug.utils import safe_join
 import matplotlib.cm as cm
+import uuid
 
 from helpers import (predict_single_slice, load_model, 
                      nii_to_png_slices_all_views,
@@ -41,7 +42,7 @@ def upload_files():
         return jsonify({"error": "Please upload exactly 2 files: FLAIR and T1CE"}), 400
 
     # Create a unique case folder
-    case_id = f"case_{len(cases) + 1}"
+    case_id = case_id = f"case_{uuid.uuid4().hex[:8]}"
     case_folder = os.path.join(UPLOAD_DIR, case_id)
     os.makedirs(case_folder, exist_ok=True)
 
@@ -115,16 +116,25 @@ def get_cases():
 
 @app.route("/api/cases/<case_id>", methods=["DELETE"])
 def delete_case(case_id):
-    case = cases.get(case_id)
-    if not case:
-        return {"error": "Case not found"}, 404
+    case_dir = os.path.join(UPLOAD_DIR, case_id)
+    overlay_dir = os.path.join(OVERLAY_DIR, case_id)
 
-    case_folder = os.path.join(UPLOAD_DIR, f"case_{case_id}")
-    if os.path.exists(case_folder):
-        shutil.rmtree(case_folder)
+    if os.path.exists(case_dir):
+        shutil.rmtree(case_dir)
 
-    del cases[case_id]
-    return {"message": "Case deleted"}
+    if os.path.exists(overlay_dir):
+        shutil.rmtree(overlay_dir)
+
+    metadata = load_metadata()
+
+    if case_id in cases:
+        del cases[case_id]
+
+    if case_id in metadata:
+        del metadata[case_id]
+        save_metadata(metadata)
+
+    return jsonify({"status": "ok"})
 
 @app.route("/api/cases/<case_id>/rename", methods=["POST"])
 def rename_case(case_id):

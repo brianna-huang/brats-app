@@ -156,86 +156,12 @@ def nii_to_png_slices_all_views(nii_path, output_dir, modality_name):
     return views
 
 
-def load_metadata():
-    if not os.path.exists(METADATA_PATH):
-        return {}
-
-    try:
-        with open(METADATA_PATH, "r") as f:
-            content = f.read().strip()
-            if not content:
-                return {}
-            return json.loads(content)
-    except (json.JSONDecodeError, IOError):
-        return {}
-
-
 def save_metadata(data):
     with open(METADATA_PATH, "w") as f:
         json.dump(data, f, indent=2)
 
-
-# def logits_to_probabilities(logits):
-#     """
-#     logits: torch.Tensor [C, H, W] or [1, C, H, W]
-#     returns: probs [C, H, W]
-#     """
-#     if logits.dim() == 4:
-#         logits = logits.squeeze(0)
-
-#     probs = F.softmax(logits, dim=0)
-#     return probs
-
-# def probabilities_to_segmentation(probs):
-#     """
-#     probs: [C, H, W]
-#     returns: [H, W] int mask
-#     """
-#     seg = torch.argmax(probs, dim=0)
-#     return seg
-
-# def probabilities_to_confidence(probs):
-#     """
-#     probs: [C, H, W]
-#     returns: [H, W] confidence in [0, 1]
-#     """
-#     confidence, _ = torch.max(probs, dim=0)
-#     return confidence
-
-# def segmentation_to_rgba(seg):
-#     """
-#     seg: [H, W] int
-#     returns: [H, W, 4] uint8 RGBA
-#     """
-#     h, w = seg.shape
-#     rgba = np.zeros((h, w, 4), dtype=np.uint8)
-
-#     # Example: tumor = class 1
-#     rgba[seg == 1] = [255, 0, 0, 255]  # red
-
-#     return rgba
-
-# def confidence_to_rgba(conf):
-#     """
-#     conf: [H, W] float in [0, 1]
-#     returns: [H, W, 4] uint8 RGBA
-#     """
-#     conf = conf.cpu().numpy()
-#     conf = (conf * 255).astype(np.uint8)
-
-#     rgba = np.zeros((conf.shape[0], conf.shape[1], 4), dtype=np.uint8)
-#     rgba[..., 0] = conf          # red channel
-#     rgba[..., 3] = conf          # alpha tied to confidence
-
-#     return rgba
-
-# def build_overlay_slices(volume, overlay_volume):
-#     """
-#     volume: [D, H, W] (used only for slicing consistency)
-#     overlay_volume: [D, H, W, 4]
-#     """
-#     return {
-#         "axial":    [overlay_volume[i] for i in range(volume.shape[0])],
-#         "coronal":  [overlay_volume[:, i, :] for i in range(volume.shape[1])],
-#         "sagittal": [overlay_volume[:, :, i] for i in range(volume.shape[2])]
-#     }
+def load_metadata():
+    if not os.path.exists(METADATA_PATH):
+        return {}
+    with open(METADATA_PATH, "r") as f:
+        return json.load(f)
