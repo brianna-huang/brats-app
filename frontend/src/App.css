@@ -181,6 +181,32 @@ body, input, button {
   justify-content: center;
 }
 
+.corner-label {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 20;
+
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  opacity: 0.35;
+  transition: opacity 0.2s ease-in-out;
+
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+
+  padding: 4px 8px;
+  border-radius: 4px;
+
+  pointer-events: none; /* never block mouse interactions */
+  user-select: none;
+}
+
+.image-stage:hover .corner-label {
+  opacity: 0.85;
+}
+
 .image-layer {
   position: relative;
   width: 100%;
@@ -220,7 +246,7 @@ body, input, button {
   height: 100%;
   object-fit: contain;
   pointer-events: none;
-  mix-blend-mode: multiply;
+  /* mix-blend-mode: multiply; */
 }
 
 /* Floating zoom toolbar */
@@ -263,6 +289,18 @@ body, input, button {
   justify-content: stretch; /* stretch children to same height */
   width: 100%;
   flex-wrap: wrap;          /* wrap on smaller screens */
+  touch-action: none;       /* disable default touch actions */
+  overscroll-behavior: contain;
+}
+
+.preview-image,
+.overlay-image,
+.loading-overlay {
+  pointer-events: none;
+}
+
+.volume-viewer {
+  pointer-events: auto;
 }
 
 .volume-panel {
@@ -597,4 +635,5 @@ body, input, button {
   border-radius: 8px;
   z-index: 50;
   text-align: center;
+  pointer-events: all; /* block interactions while AI runs */
 }

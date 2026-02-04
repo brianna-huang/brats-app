@@ -76,6 +76,8 @@ function App() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const viewerRef = useRef<HTMLDivElement>(null);
+
   const activeCase = cases.find((c) => c.id === activeCaseId) || null;
 
   const alreadyComputed =
@@ -88,6 +90,32 @@ function App() {
       .then((res) => res.json())
       .then((data) => setCases(data))
       .catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("cases", JSON.stringify(cases));
+  }, [cases]);
+
+  // Load cases from localStorage on app startup
+  useEffect(() => {
+    const savedCases = localStorage.getItem("cases");
+    if (savedCases) {
+      setCases(JSON.parse(savedCases));
+    }
+  }, []);
+
+  // Restore last active case
+  useEffect(() => {
+    if (activeCaseId) {
+      localStorage.setItem("activeCaseId", activeCaseId);
+    }
+  }, [activeCaseId]);
+
+  useEffect(() => {
+    const savedActive = localStorage.getItem("activeCaseId");
+    if (savedActive) {
+      setActiveCaseId(savedActive);
+    }
   }, []);
 
   // Update overlay when slider or view changes
@@ -177,6 +205,38 @@ function App() {
       setIsAiRunning(false);
     }
   };
+
+  // Handles mouse wheel for slice navigation
+  useEffect(() => {
+    const el = viewerRef.current;
+    if (!el || !activeCase) return;
+
+    const lastWheelTime = { current: 0 };
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const now = Date.now();
+
+      // Only process if at least 30ms have passed since last slice change
+      if (now - lastWheelTime.current < 30) return;
+      lastWheelTime.current = now;
+
+      // delta for smooth acceleration
+      const max = activeCase.flair_slices[view].length - 1;
+      const delta = Math.sign(e.deltaY) * Math.ceil(Math.abs(e.deltaY) / 50);
+
+      setSliceIndex((prev) =>
+        Math.min(Math.max(prev + delta, 0), max)
+      );
+    };
+
+  el.addEventListener("wheel", handleWheel, { passive: false });
+
+  return () => el.removeEventListener("wheel", handleWheel);
+}, [activeCase, view]);
+
 
   // Handles case deletion
   const deleteCase = async (caseId: string) => {
@@ -309,14 +369,6 @@ function App() {
                     {alreadyComputed ? "AI Ready" : "Run AI"}
                   </button>
 
-                  {/* Loading message */}
-                  {isAiRunning && (
-                    <div className="loading-overlay">
-                      🧠 Running AI...please wait
-                    </div>
-                  )}
-                  {aiError && <div className="error">{aiError}</div>}
-
                   {/* Dropdown to select view */}
                   <div className="view-controls">
                     <label>
@@ -438,22 +490,28 @@ function App() {
                     </div>
                   </div>
                 )}
-                
-              
               </div>
 
                 {/* Image viewers */}
-                <div className="volume-viewer">
+                <div ref={viewerRef} className="volume-viewer">
+                  {/* Loading message */}
+                  {isAiRunning && (
+                    <div className="loading-overlay">
+                      🧠 Running AI...please wait
+                    </div>
+                  )}
+                  {aiError && <div className="error">{aiError}</div>}
 
                   {/* FLAIR */}
                   <div className="volume-panel">
-                    <h3>FLAIR</h3>
+                    {/* <h3>FLAIR</h3> */}
                     <div className="image-container">
                       <TransformWrapper
                         initialScale={1}
                         minScale={0.5}
                         maxScale={5}
-                        wheel={{ step: 0.1 }}
+                        wheel={{ disabled: true }}
+                        // wheel={{ step: 0.1 }}
                       >
                         {({ zoomIn, zoomOut, resetTransform }) => (
                           <>
@@ -463,6 +521,9 @@ function App() {
                               contentStyle={{ width: "100%", height: "100%" }}
                             >
                               <div className="image-stage">
+                                <div className="corner-label">
+                                  FLAIR • {view.toUpperCase()} • {sliceIndex + 1}
+                                </div>
                                 <div className="image-layer">
                                   <img
                                     src={activeCase?.flair_slices[view][sliceIndex]}
@@ -495,13 +556,14 @@ function App() {
 
                   {/* T1CE */}
                   <div className="volume-panel">
-                    <h3>T1CE</h3>
+                    {/* <h3>T1CE</h3> */}
                     <div className="image-container">
                       <TransformWrapper
                         initialScale={1}
                         minScale={0.5}
                         maxScale={5}
-                        wheel={{ step: 0.1 }}
+                        wheel={{ disabled: true }}
+                        // wheel={{ step: 0.1 }}
                       >
                         {({ zoomIn, zoomOut, resetTransform }) => (
                           <>
@@ -511,6 +573,9 @@ function App() {
                               contentStyle={{ width: "100%", height: "100%" }}
                             >
                               <div className="image-stage">
+                                <div className="corner-label">
+                                  T1CE • {view.toUpperCase()} • {sliceIndex + 1}
+                                </div>
                                 <div className="image-layer">
                                   <img
                                     src={activeCase?.t1ce_slices[view][sliceIndex]}
