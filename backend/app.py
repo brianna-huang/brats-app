@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import shutil
 from werkzeug.utils import safe_join
+import matplotlib.cm as cm
 
 from helpers import (predict_single_slice, load_model, 
                      nii_to_png_slices_all_views,
@@ -140,61 +141,79 @@ def rename_case(case_id):
 
 @app.route("/api/detect", methods=["POST"])
 def detect():
-    case_id = request.json["caseId"]  # ex: case_1
-    slice_index = request.json.get("sliceIndex")
-    view = request.json.get("view", "axial")  # 'axial', 'sagittal', or 'coronal'
+    case_id = request.json["caseId"]
 
     case_dir = os.path.join(UPLOAD_DIR, case_id)
-    if not os.path.exists(case_dir):
-        return jsonify({"error": "Case not found"}), 404
-
     flair_file = next(f for f in os.listdir(case_dir) if "flair" in f.lower())
     t1ce_file = next(f for f in os.listdir(case_dir) if "t1ce" in f.lower())
 
     flair_vol = nib.load(os.path.join(case_dir, flair_file)).get_fdata()
     t1ce_vol = nib.load(os.path.join(case_dir, t1ce_file)).get_fdata()
 
-    # Determine slice index along chosen view
-    if view == "axial":
-        max_index = flair_vol.shape[2] - 1
-        z = slice_index if slice_index is not None else flair_vol.shape[2] // 2
-        flair_slice = flair_vol[:, :, z]
-        t1ce_slice = t1ce_vol[:, :, z]
-    elif view == "sagittal":
-        max_index = flair_vol.shape[0] - 1
-        z = slice_index if slice_index is not None else flair_vol.shape[0] // 2
-        flair_slice = flair_vol[z, :, :]
-        t1ce_slice = t1ce_vol[z, :, :]
-        flair_slice = np.rot90(flair_slice)  # rotate for display
-        t1ce_slice = np.rot90(t1ce_slice)
-    elif view == "coronal":
-        max_index = flair_vol.shape[1] - 1
-        z = slice_index if slice_index is not None else flair_vol.shape[1] // 2
-        flair_slice = flair_vol[:, z, :]
-        t1ce_slice = t1ce_vol[:, z, :]
-        flair_slice = np.rot90(flair_slice)
-        t1ce_slice = np.rot90(t1ce_slice)
-    else:
-        return jsonify({"error": "Invalid view"}), 400
+    out_base = os.path.join(OVERLAY_DIR, case_id)
+    os.makedirs(out_base, exist_ok=True)
 
-    pred = predict_single_slice(flair_slice, t1ce_slice, model)
-    overlay = create_multiclass_overlay(pred)
+    segmentation = {"axial": [], "sagittal": [], "coronal": []}
+    confidence = {"axial": [], "sagittal": [], "coronal": []}
 
-    if view in ["sagittal", "coronal"]:
-        overlay = np.rot90(overlay, k=-1)
+    for view in ["axial", "sagittal", "coronal"]:
+        os.makedirs(os.path.join(out_base, view), exist_ok=True)
 
-    # Save overlay PNG
-    out_dir = os.path.join(OVERLAY_DIR, case_id, view)
-    os.makedirs(out_dir, exist_ok=True)
-    out_path = os.path.join(out_dir, f"slice_{z}.png")
-    plt.imsave(out_path, overlay)
+        if view == "axial":
+            indices = range(flair_vol.shape[2])
+            get_slice = lambda i: (flair_vol[:, :, i], t1ce_vol[:, :, i])
+        elif view == "sagittal":
+            indices = range(flair_vol.shape[0])
+            get_slice = lambda i: (np.rot90(flair_vol[i,:,:]), np.rot90(t1ce_vol[i,:,:]))
+        else:
+            indices = range(flair_vol.shape[1])
+            get_slice = lambda i: (np.rot90(flair_vol[:,i,:]), np.rot90(t1ce_vol[:,i,:]))
+
+        for i in indices:
+            flair_slice, t1ce_slice = get_slice(i)
+            pred = predict_single_slice(flair_slice, t1ce_slice, model)
+
+            # --- Segmentation overlay ---
+            seg_overlay = create_multiclass_overlay(pred)
+
+            # --- CConfidence overlay (only on tumor) ---
+            tumor_mask = np.argmax(pred, axis=0) > 0  # True for any tumor class
+            conf = np.max(pred[1:], axis=0)           # only take tumor class probabilities
+            
+            conf_overlay = np.zeros((*conf.shape, 4), dtype=np.uint8)
+            # conf_overlay[..., 0] = (conf * 255).astype(np.uint8)   # red
+            # conf_overlay[..., 3] = (conf * 255 * tumor_mask).astype(np.uint8)  # alpha only on tumor
+            conf_overlay[..., 0] = tumor_mask * 255  # red channel
+            conf_overlay[..., 1] = tumor_mask * (conf * 255).astype(np.uint8)  # green channel
+            conf_overlay[..., 2] = tumor_mask * (conf * 255).astype(np.uint8)  # blue channel
+            conf_overlay[..., 3] = tumor_mask * (conf * 255).astype(np.uint8)  # alpha
+
+            if view in ["sagittal", "coronal"]:
+                conf_overlay = np.rot90(conf_overlay, k=-1)
+                seg_overlay = np.rot90(seg_overlay, k=-1)
+
+            # --- Save PNGs ---
+            seg_path = os.path.join(out_base, view, f"seg_{i}.png")
+            conf_path = os.path.join(out_base, view, f"conf_{i}.png")
+
+            plt.imsave(seg_path, seg_overlay)
+            plt.imsave(conf_path, conf_overlay)
+
+            segmentation[view].append(f"/api/overlay/{case_id}/{view}/seg_{i}.png")
+            confidence[view].append(f"/api/overlay/{case_id}/{view}/conf_{i}.png")
 
     return jsonify({
-        "overlayUrl": f"/api/overlay/{case_id}/{view}/slice_{z}.png",
-        "sliceIndex": z,
-        "maxIndex": max_index
+        "segmentation_slices": segmentation,
+        "confidence_slices": confidence,
+        "legend": {
+            "segmentation": {
+                "1": "Necrotic / Core",
+                "2": "Edema",
+                "3": "Enhancing"
+            },
+            "confidence": "Red → Yellow → White indicates increasing AI certainty (only where tumor exists)"
+        }
     })
-
 
 @app.route("/api/overlay/<case_id>/<view>/<slice_file>")
 def get_overlay(case_id, view, slice_file):
