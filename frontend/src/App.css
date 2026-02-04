@@ -173,18 +173,6 @@ body, input, button {
   font-size: 14px;
 }
 
-
-
-.image-container {
-  position: relative;
-  width: 100%;
-  max-width: 520px;
-  aspect-ratio: 1 / 1;
-  background: black;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
 .image-stage {
   width: 100%;
   height: 100%;
@@ -232,6 +220,7 @@ body, input, button {
   height: 100%;
   object-fit: contain;
   pointer-events: none;
+  mix-blend-mode: multiply;
 }
 
 /* Floating zoom toolbar */
@@ -268,34 +257,24 @@ body, input, button {
   color: white;
 }
 
-/* Detect button */
-.detect-button {
-  margin-top: 16px;
-  padding: 10px 18px;
-  font-size: 15px;
-  cursor: pointer;
-  border-radius: 6px;
-  border: none;
-  background-color: #e04f4f;
-  color: white;
-}
-
-.detect-button:hover {
-  background-color: #c43e3e;
-}
-
 .volume-viewer {
   display: flex;
-  gap: 30px;
-  justify-content: flex-start;
+  gap: 12px;               /* space between images */
+  justify-content: stretch; /* stretch children to same height */
   width: 100%;
+  flex-wrap: wrap;          /* wrap on smaller screens */
 }
 
 .volume-panel {
+  flex: 1 1 45%;            /* grow/shrink, base width 45% */
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  width: 45%;
+  align-items: stretch;
+  background: #121212;
+  border-radius: 8px;
+  overflow: hidden;
+  min-width: 300px;         /* avoid panels getting too tiny */
+  max-height: 75vh;
 }
 
 .volume-panel h3 {
@@ -309,14 +288,19 @@ body, input, button {
 .image-container {
   position: relative;
   width: 100%;
-  max-width: 500px;     /* controls how big the images get */
-  aspect-ratio: 1 / 1; /* square viewer */
+  flex: 1;                   /* take up remaining height */
   background: black;
   border-radius: 8px;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.image-stage, .image-layer, .preview-image, .overlay-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;       /* maintain aspect ratio */
 }
 
 .slice-controls {
@@ -369,76 +353,177 @@ body, input, button {
   border-radius: 3px;
 }
 
-.legend-panel h4 {
-  margin: 0 0 8px 0;
-  font-size: 12px;
+
+.controls-wrapper {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;              /* space between left and right panels */
+  width: 100%;
+  flex-wrap: wrap;         /* allow panels to wrap on smaller screens */
+  align-items: stretch;    /* make both panels same height */
+  margin-bottom: 12px;
 }
 
-.legend-item {
+.controls-panel {
+  flex: 1 1 400px;        /* grow, shrink, base width */
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(30, 30, 30, 0.9);
+  color: #eaeaea;
+  font-size: 13px;
+}
+
+.controls-panel button {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  width: 150px;
+  cursor: pointer;
+  background-color: #2a2a2a;
+  color: white;
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.controls-panel button:disabled {
+  opacity: 0.85;
+  cursor: not-allowed;
+}
+
+.controls-panel button:hover:not(:disabled) {
+  background-color: #298139;
+}
+
+.confidence-legend-bar {
+  display: inline-block;
+  width: 120px;
+  height: 12px;
+  background: linear-gradient(to right, red, yellow, white);
+  border-radius: 4px;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+.ai-ready-button {
+  position: relative;
+  padding-left: 24px;
+}
+
+/* Green circle for AI ready button */
+.ai-ready-button::before {
+  content: "";
+  position: absolute;
+  left: 25px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 10px;
+  height: 10px;
+  background-color: #4caf50; /* green */
+  border-radius: 50%;
+  box-shadow: 0 0 2px #4caf50;
+}
+
+/* Play symbol for "Run AI" */
+.ai-run-button {
+  position: relative;
+  padding-left: 24px; /* space for play icon */
+}
+
+.ai-run-button::before {
+  content: "";
+  position: absolute;
+  left: 35px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-left: 10px solid white; /* triangle for play */
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+}
+
+.ai-mode-selector {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ai-mode-selector label {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  margin-bottom: 4px;
+  gap: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  opacity: 1;
+  transition: opacity 0.2s;
 }
 
-.legend-color {
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
+/* Make text grey when input is disabled */
+.ai-mode-selector input[type="radio"]:disabled + span {
+  color: #888;
+  cursor: not-allowed;
+  pointer-events: none; /* prevent clicking label */
 }
 
-.legend-color.necrotic {
-  background: red;
+
+.controls-side-panel {
+  flex: 1 1 250px;       /* adjust min width if needed */
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(30, 30, 30, 0.9);
+  color: #eaeaea;
 }
 
-.legend-color.edema {
-  background: green;
-}
-
-.legend-color.enhancing {
-  background: blue;
-}
-
-.controls-panel h4 {
+.controls-side-panel h4 {
   margin: 0 0 3px 0;
   font-size: 13px;
 }
 
-.controls-panel .legend-item {
+/* Legends inside right panel */
+.controls-side-panel .legend-panel {
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.controls-side-panel .legend-item {
   display: flex;
   align-items: center;
   gap: 6px;
   margin-bottom: 4px;
+  font-size: 12px;
 }
 
-.controls-panel .legend-color {
+.controls-side-panel .legend-color {
   width: 14px;
   height: 14px;
   border-radius: 3px;
 }
 
-.controls-panel .legend-color.necrotic {
+.controls-side-panel .legend-color.necrotic {
   background: red;
 }
 
-.controls-panel .legend-color.edema {
+.controls-side-panel .legend-color.edema {
   background: green;
 }
 
-.controls-panel .legend-color.enhancing {
+.controls-side-panel .legend-color.enhancing {
   background: blue;
 }
 
-.controls-panel .opacity-slider {
+.controls-side-panel .opacity-slider {
   display: flex;
   flex-direction: column;
-  margin-top: 10px;
 }
 
-.controls-panel .opacity-slider input[type="range"] {
+.controls-side-panel .opacity-slider input[type="range"] {
   -webkit-appearance: none;
-  width: 100%;
+  width: 75%;
   height: 6px;
   background: #555;
   border-radius: 3px;
@@ -446,7 +531,7 @@ body, input, button {
   outline: none;
 }
 
-.controls-panel .opacity-slider input[type="range"]::-webkit-slider-thumb {
+.controls-side-panel .opacity-slider input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 14px;
   height: 14px;
@@ -456,7 +541,7 @@ body, input, button {
   border: 2px solid #fff;
 }
 
-.controls-panel .opacity-slider input[type="range"]::-moz-range-thumb {
+.controls-side-panel .opacity-slider input[type="range"]::-moz-range-thumb {
   width: 14px;
   height: 14px;
   border-radius: 50%;
@@ -465,19 +550,9 @@ body, input, button {
   cursor: pointer;
 }
 
-.controls-panel {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
-  background: rgba(30, 30, 30, 0.8);
-  padding: 8px 12px;
-  border-radius: 8px;
-  width: 100%;
-  max-width: 600px;
-  color: #eaeaea;
-  font-size: 13px;
+.controls-side-panel .legend-panel,
+.controls-side-panel .opacity-slider {
+  flex-shrink: 0;
 }
 
 .controls-panel label {
@@ -492,14 +567,6 @@ body, input, button {
   width: 16px;
   height: 16px;
   cursor: pointer;
-}
-.controls-panel .opacity-slider {
-  display: flex;
-  flex-direction: column;
-}
-
-.controls-panel .opacity-slider input[type="range"] {
-  width: 120px;
 }
 
 .overlay-toggle {
@@ -516,4 +583,18 @@ body, input, button {
   align-items: center;
   gap: 6px;
   cursor: pointer;
+}
+
+.loading-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0,0,0,0.75);
+  color: white;
+  font-weight: bold;
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  z-index: 50;
+  text-align: center;
 }
