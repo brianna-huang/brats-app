@@ -1,9 +1,5 @@
 # Brain Tumor Segmentation App
 
-**Work in Progress**
-
----
-
 ## Project Overview
 The Brain Tumor Segmentation App allows users to upload FLAIR and T1CE brain MRI images for tumor detection. It uses an AI model to predict where possible tumors are, overlaying a color segment that highlights the different tumor classes to see their location and shape. The main viewer page allows users to scroll through slices of any view (axial, sagittal, coronal).
 
