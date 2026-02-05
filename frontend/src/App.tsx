@@ -524,7 +524,29 @@ function App() {
                                 <div className="corner-label">
                                   FLAIR • {view.toUpperCase()} • {sliceIndex + 1}
                                 </div>
-                                <div className="image-layer">
+                                {/* Orientation markers */}
+                                <div className="orientation-marker top">
+                                  {view === "axial" && "A"}
+                                  {view === "sagittal" && "S"}
+                                  {view === "coronal" && "S"}
+                                </div>
+                                <div className="orientation-marker bottom">
+                                  {view === "axial" && "P"}
+                                  {view === "sagittal" && "I"}
+                                  {view === "coronal" && "I"}
+                                </div>
+                                <div className="orientation-marker left">
+                                  {view === "axial" && "R"}
+                                  {view === "sagittal" && "A"}
+                                  {view === "coronal" && "R"}
+                                </div>
+                                <div className="orientation-marker right">
+                                  {view === "axial" && "L"}
+                                  {view === "sagittal" && "P"}
+                                  {view === "coronal" && "L"}
+                                </div>
+
+                                <div className={`image-layer ${view}`}>
                                   <img
                                     src={activeCase?.flair_slices[view][sliceIndex]}
                                     className="preview-image"
@@ -576,7 +598,29 @@ function App() {
                                 <div className="corner-label">
                                   T1CE • {view.toUpperCase()} • {sliceIndex + 1}
                                 </div>
-                                <div className="image-layer">
+                                {/* Orientation markers */}
+                                <div className="orientation-marker top">
+                                  {view === "axial" && "A"}
+                                  {view === "sagittal" && "S"}
+                                  {view === "coronal" && "S"}
+                                </div>
+                                <div className="orientation-marker bottom">
+                                  {view === "axial" && "P"}
+                                  {view === "sagittal" && "I"}
+                                  {view === "coronal" && "I"}
+                                </div>
+                                <div className="orientation-marker left">
+                                  {view === "axial" && "R"}
+                                  {view === "sagittal" && "A"}
+                                  {view === "coronal" && "R"}
+                                </div>
+                                <div className="orientation-marker right">
+                                  {view === "axial" && "L"}
+                                  {view === "sagittal" && "P"}
+                                  {view === "coronal" && "L"}
+                                </div>
+
+                                <div className={`image-layer ${view}`}>
                                   <img
                                     src={activeCase?.t1ce_slices[view][sliceIndex]}
                                     className="preview-image"

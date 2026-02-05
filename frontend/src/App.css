@@ -207,6 +207,48 @@ body, input, button {
   opacity: 0.85;
 }
 
+.orientation-marker {
+  position: absolute;
+  z-index: 20;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: bold;
+  opacity: 0.35;
+  user-select: none;
+  pointer-events: none;
+  text-shadow: 0 0 3px black;
+}
+
+/* Positions */
+.orientation-marker.top {
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.orientation-marker.bottom {
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.orientation-marker.left {
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.orientation-marker.right {
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Fade in on hover */
+.image-stage:hover .orientation-marker {
+  opacity: 0.85;
+}
+
 .image-layer {
   position: relative;
   width: 100%;
@@ -224,6 +266,18 @@ body, input, button {
   height: 100%;
   object-fit: contain;
   display: block;
+}
+
+.image-layer.axial img {
+  transform: rotate(90deg);
+}
+
+.image-layer.sagittal img {
+  transform: rotate(-90deg);
+}
+
+.image-layer.coronal img {
+  transform: rotate(-90deg);
 }
 
 /* Tumor overlay */
@@ -252,8 +306,8 @@ body, input, button {
 /* Floating zoom toolbar */
 .zoom-toolbar {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 6px;
+  right: 6px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -261,12 +315,12 @@ body, input, button {
   padding: 6px 8px;
   border-radius: 6px;
   z-index: 10;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .zoom-toolbar button {
   padding: 4px 8px;
-  font-size: 14px;
+  font-size: 12px;
   cursor: pointer;
   border: none;
   background-color: #2f2f2f;
