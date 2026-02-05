@@ -117,7 +117,7 @@ body, input, button {
 /* Main image panel */
 .main {
   flex: 1;
-  padding: 24px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -128,7 +128,7 @@ body, input, button {
 .main h2 {
   text-align: left;
   width: 100%; /* ensure it spans the container */
-  margin-bottom: 20px;
+  margin-bottom: 15px;
   font-size: 20px;
   font-weight: 600;
 }

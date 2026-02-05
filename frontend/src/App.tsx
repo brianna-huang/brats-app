@@ -29,6 +29,7 @@ interface Case {
 }
 
 type AIVizMode = "off" | "segmentation" | "confidence";
+type View = "axial" | "sagittal" | "coronal";
 
 function App() {
   const [cases, setCases] = useState<Case[]>([]);
@@ -41,7 +42,12 @@ function App() {
   const [legend, setLegend] = useState<any>(null); 
   const [overlayOpacity, setOverlayOpacity] = useState(70); // default 50% transparency
   const [view, setView] = useState<"axial"|"sagittal"|"coronal">("axial");
-  const [sliceIndex, setSliceIndex] = useState(0);
+  // const [sliceIndex, setSliceIndex] = useState(0);
+  const [sliceIndexByView, setSliceIndexByView] = useState<Record<View, number>>({
+    axial: 0,
+    sagittal: 0,
+    coronal: 0,
+  });
   const [sidebarWidth, setSidebarWidth] = useState(260); // initial width
 
   // sidebar adjustment logic
@@ -79,6 +85,8 @@ function App() {
   const viewerRef = useRef<HTMLDivElement>(null);
 
   const activeCase = cases.find((c) => c.id === activeCaseId) || null;
+
+  const sliceIndex = sliceIndexByView[view];
 
   const alreadyComputed =
     !!activeCase?.segmentation_slices &&
@@ -131,7 +139,7 @@ function App() {
     }
 
     return null;
-  }, [activeCase, aiVizMode, view, sliceIndex]);
+  }, [activeCase, aiVizMode, view, sliceIndexByView]);
 
   // Handle upload button click (opens file picker)
   const handleUploadClick = () => {
@@ -159,7 +167,11 @@ function App() {
     setActiveCaseId(data.case.id);
 
     // Reset slice indices
-    setSliceIndex(0);
+    setSliceIndexByView({
+      axial: 0,
+      sagittal: 0,
+      coronal: 0,
+    });
     setAiVizMode("off");
   };
 
@@ -227,16 +239,84 @@ function App() {
       const max = activeCase.flair_slices[view].length - 1;
       const delta = Math.sign(e.deltaY) * Math.ceil(Math.abs(e.deltaY) / 50);
 
-      setSliceIndex((prev) =>
-        Math.min(Math.max(prev + delta, 0), max)
-      );
+      setSliceIndexByView(prev => ({
+        ...prev,
+        [view]: Math.min(Math.max(prev[view] + delta, 0), max),
+      }));
     };
 
-  el.addEventListener("wheel", handleWheel, { passive: false });
+    el.addEventListener("wheel", handleWheel, { passive: false });
 
-  return () => el.removeEventListener("wheel", handleWheel);
-}, [activeCase, view]);
+    return () => el.removeEventListener("wheel", handleWheel);
+  }, [activeCase, view]);
 
+  // Handles keyboard shortcuts within image viewer
+  useEffect(() => {
+    if (!activeCase) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // avoid hijacking typing
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      const maxSlice = activeCase.flair_slices[view].length - 1;
+
+      switch (e.key) {
+        // Slice navigation
+        case "ArrowUp":
+          setSliceIndexByView(prev => ({
+            ...prev,
+            [view]: Math.min(prev[view] + 1, maxSlice),
+          }));
+          break;
+
+        case "ArrowDown":
+          setSliceIndexByView(prev => ({
+            ...prev,
+            [view]: Math.max(prev[view] - 1, 0),
+          }));
+          break;
+
+        // View switching
+        case "1":
+          setView("axial");
+          break;
+        case "2":
+          setView("sagittal");
+          break;
+        case "3":
+          setView("coronal");
+          break;
+
+        // AI overlay modes
+        case "s":
+        case "S":
+          if (activeCase.segmentation_slices) {
+            setAiVizMode("segmentation");
+          }
+          break;
+
+        case "c":
+        case "C":
+          if (activeCase.confidence_slices) {
+            setAiVizMode("confidence");
+          }
+          break;
+
+        case "o":
+        case "O":
+          setAiVizMode("off");
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeCase, view]);
 
   // Handles case deletion
   const deleteCase = async (caseId: string) => {
@@ -318,7 +398,11 @@ function App() {
                     className={`file-button ${c.id === activeCaseId ? "active" : ""}`}
                     onClick={() => {
                       setActiveCaseId(c.id);
-                      setSliceIndex(0);
+                      setSliceIndexByView({
+                        axial: 0,
+                        sagittal: 0,
+                        coronal: 0,
+                      });
                       setAiVizMode("off");
                     }}
                     onDoubleClick={() => {
@@ -375,7 +459,6 @@ function App() {
                       View:{" "}
                       <select value={view} onChange={(e) => {
                         setView(e.target.value as "axial"|"sagittal"|"coronal");
-                        setSliceIndex(0); // reset slice to first for new view
                       }}>
                         <option value="axial">Axial</option>
                         <option value="sagittal">Sagittal</option>
@@ -432,14 +515,19 @@ function App() {
                   {/* Slice slider */}
                   <div className="slice-controls">
                         <span>
-                          Slice {sliceIndex + 1} / {activeCase.flair_slices[view].length}
+                          Slice {sliceIndexByView[view] + 1} / {activeCase.flair_slices[view].length}
                         </span>
                         <input
                           type="range"
                           min={0}
                           max={activeCase.flair_slices[view].length - 1}
                           value={sliceIndex}
-                          onChange={(e) => setSliceIndex(Number(e.target.value))}
+                          onChange={(e) =>
+                            setSliceIndexByView(prev => ({
+                              ...prev,
+                              [view]: Number(e.target.value),
+                            }))
+                          }
                         />
                       </div>
 
@@ -522,7 +610,7 @@ function App() {
                             >
                               <div className="image-stage">
                                 <div className="corner-label">
-                                  FLAIR • {view.toUpperCase()} • {sliceIndex + 1}
+                                  FLAIR • {view.toUpperCase()} • {sliceIndexByView[view] + 1}
                                 </div>
                                 {/* Orientation markers */}
                                 <div className="orientation-marker top">
@@ -548,7 +636,7 @@ function App() {
 
                                 <div className={`image-layer ${view}`}>
                                   <img
-                                    src={activeCase?.flair_slices[view][sliceIndex]}
+                                    src={activeCase?.flair_slices[view][sliceIndexByView[view]]}
                                     className="preview-image"
                                     alt={`FLAIR ${view}`}
                                   />
@@ -596,7 +684,7 @@ function App() {
                             >
                               <div className="image-stage">
                                 <div className="corner-label">
-                                  T1CE • {view.toUpperCase()} • {sliceIndex + 1}
+                                  T1CE • {view.toUpperCase()} • {sliceIndexByView[view] + 1}
                                 </div>
                                 {/* Orientation markers */}
                                 <div className="orientation-marker top">
@@ -622,7 +710,7 @@ function App() {
 
                                 <div className={`image-layer ${view}`}>
                                   <img
-                                    src={activeCase?.t1ce_slices[view][sliceIndex]}
+                                    src={activeCase?.t1ce_slices[view][sliceIndexByView[view]]}
                                     className="preview-image"
                                     alt={`T1CE ${view}`}
                                   />
