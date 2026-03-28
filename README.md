@@ -6,13 +6,12 @@ The Brain Tumor Segmentation App allows users to upload FLAIR and T1CE brain MRI
 The app can be used as a teaching & learning aid, allowing radiologists and medical students to practice reading X-rays with AI guidance.
 
 ## Demo
+#### [Watch full demo](brats-demo.mp4)
 
-<video width="600" controls>
-  <source src="brats-demo.mp4" type="video/mp4">
-</video>
+Main viewer:
+<img width="1440" height="900" alt="Screenshot 2026-02-05 at 8 55 50 PM" src="https://github.com/user-attachments/assets/5db57611-201c-4365-ae35-16eb5c23c64a" />
 
 ---
-
 ## Tech Stack
 - **Frontend:** React + TypeScript + Vite
 - **Backend:** Flask (Python 3.x)
