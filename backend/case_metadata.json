@@ -1,5 +1,14 @@
 {
   "case_8e50ef7e": {
     "name": "patient 1"
+  },
+  "case_dd101178": {
+    "name": "Follow-up 3 months"
+  },
+  "case_43608eba": {
+    "name": "Glioblastoma"
+  },
+  "case_3999f473": {
+    "name": "Patient A Follow-up"
   }
 }

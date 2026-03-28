@@ -11,6 +11,7 @@ export default defineConfig({
       changeOrigin: true,
       secure: false,
     },
+    "/uploads": "http://localhost:5050",
   },
 },
 })

@@ -31,10 +31,9 @@ Install requirements
 pip install -r requirements.txt
 ```
 
-Run flask server 
+Run server 
 ```
-export FLASK_APP=app.py
-flask run
+python app.py
 ```
 
 ### Frontend
